@@ -14,13 +14,14 @@ trainer:
         logging_interval: epoch
   max_epochs: 100
   log_every_n_steps: 5
-  default_root_dir: output/terramind_base_sen1floods11/
+  default_root_dir: output/ArcticSeaIce-SIC/
 
 data:
-  class_path: datasets.arctic_sea_ice.ArcticSeaIceDataModule
+  class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
     batch_size: 8
     num_workers: 8
+    data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
 
 model:
   class_path: terratorch.tasks.SemanticSegmentationTask
@@ -66,7 +67,7 @@ model:
 optimizer:
   class_path: torch.optim.AdamW
   init_args:
-    lr: 1.e-4
+    lr: 1.0e-4
 lr_scheduler:
   class_path: ReduceLROnPlateau
   init_args:

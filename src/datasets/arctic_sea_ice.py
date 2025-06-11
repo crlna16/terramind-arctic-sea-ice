@@ -181,6 +181,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25,
                  batch_size: int = 8,
+                 num_workers: int = 8,
                  val_split: float = 0.1,
                  test_split: float = 0.1,
                  shuffle: bool = True,
@@ -252,10 +253,10 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                               )
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader( self.train_ds, batch_size=self.batch_size, shuffle=False,  num_workers=0, pin_memory=True)
+        return torch.utils.data.DataLoader( self.train_ds, batch_size=self.batch_size, shuffle=False,  num_workers=self.num_workers, pin_memory=True)
 
     def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.val_ds, batch_size=1, shuffle=False, num_workers=0, pin_memory=True)
+        return torch.utils.data.DataLoader(self.val_ds, batch_size=1, shuffle=False, num_workers=self.num_workers, pin_memory=True)
 
     def test_dataloader(self):
-        return torch.utils.data.DataLoader(self.test_ds, batch_size=1, shuffle=False, num_workers=0, pin_memory=True)
+        return torch.utils.data.DataLoader(self.test_ds, batch_size=1, shuffle=False, num_workers=self.num_workers, pin_memory=True)

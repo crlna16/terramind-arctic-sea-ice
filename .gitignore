@@ -7,3 +7,4 @@ tif/
 *.sh
 *.txt
 output/
+*.out
