@@ -3,16 +3,16 @@
 from typing import List
 import xarray as xr
 import os
+from abc import ABC
 
 import torch
+from torch.utils.data import Dataset, IterableDataset
 import lightning as L
 import numpy as np
 
-class ArcticSeaIceDataset(torch.utils.data.IterableDataset):
+class ArcticSeaIceBaseDataset(ABC):
     '''
     Dataset for ready-to-train Arctic sea ice charts.
-
-    The dataset is iterable and yields random patches from the ice charts.
     '''
     def __init__(self,
                  ice_charts: List[str],
@@ -23,7 +23,7 @@ class ArcticSeaIceDataset(torch.utils.data.IterableDataset):
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25
                 ):
-        """ArcticSeaIceDataset
+        """ArcticSeaIceBaseDataset
 
         Args:
             ice_charts (list[str]): List of ice chart file paths.
@@ -47,25 +47,6 @@ class ArcticSeaIceDataset(torch.utils.data.IterableDataset):
         # random number generator for iterator
         self.rng = np.random.default_rng(seed=self.seed)
 
-    def __iter__(self):
-        while True:
-            # choose random chart
-            ix = int(self.rng.random() * len(self.ice_charts))
-
-            print(ix, self.ice_charts[ix])
-            ds = self._load_dataset(self.ice_charts[ix], 
-                                self.features, 
-                                self.target,
-                                fill_values_to_nan=self.fill_values_to_nan
-                               )
-
-            # select small patch
-            ds = self._select_patch(ds, self.patch_size, seed=self.seed, max_nan_frac=self.max_nan_frac)
-
-            # convert to tensors
-            x, y = self._extract_tensors(ds, self.features, self.target)
-        
-            yield {"image": x, "mask": y.squeeze()}
 
     @staticmethod
     def _load_dataset(path, features, target, fill_values_to_nan=True):
@@ -128,15 +109,67 @@ class ArcticSeaIceDataset(torch.utils.data.IterableDataset):
 
         x = torch.stack(x)
 
-        # TODO class labels
-        y = torch.from_numpy(ds[target].values).to(torch.long)
+        y = torch.from_numpy(ds[target].values)
 
         # Missing values are NaN, convert for loss function
         x = torch.nan_to_num(x, nan=0.0)
-        y = torch.nan_to_num(y, nan=-1)
+        y = torch.nan_to_num(y, nan=-1).to(torch.long)
 
         return x, y
 
+class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
+    '''Iterable dataset for Arctic sea ice charts.'''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __len__(self):
+        """Return the number of samples in the dataset."""
+        return len(self.ice_charts) * 10
+
+    def __iter__(self):
+        samples_per_epoch = len(self.ice_charts) * 10 
+        
+        for _ in range(samples_per_epoch):
+            # choose random chart
+            ix = int(self.rng.random() * len(self.ice_charts))
+            
+            ds = self._load_dataset(self.ice_charts[ix], 
+                                self.features, 
+                                self.target,
+                                fill_values_to_nan=self.fill_values_to_nan
+                               )
+
+            # select small patch
+            ds = self._select_patch(ds, self.patch_size, seed=self.seed, max_nan_frac=self.max_nan_frac)
+
+            # convert to tensors
+            x, y = self._extract_tensors(ds, self.features, self.target)
+        
+            yield {"image": x, "mask": y.squeeze()}
+
+class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
+    '''Dataset for inference on Arctic sea ice charts.'''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __len__(self):
+        """Return the number of ice charts in the dataset."""
+        return len(self.ice_charts)
+
+    def __getitem__(self, idx):
+        """Get a full patch from the dataset"""
+
+        ds = self._load_dataset(self.ice_charts[idx],
+                                self.features, 
+                                self.target,
+                                fill_values_to_nan=self.fill_values_to_nan
+                               )
+
+        ds = self._select_patch(ds, 2048, seed=self.seed, max_nan_frac=1.0)
+        # convert to tensors
+        x, y = self._extract_tensors(ds, self.features, self.target)
+    
+        return {"image": x, "mask": y.squeeze()}
 
 class ArcticSeaIceDataModule(L.LightningDataModule):
     def __init__(self,
@@ -186,14 +219,14 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                 self.rng.shuffle(train_ice_charts)
             
             ix_val_start = int((1.0 - self.val_split) * len(train_ice_charts))
-            self.train_ds = ArcticSeaIceDataset(train_ice_charts[:ix_val_start],
-                                                features=self.features,
-                                                target=self.target,
-                                                seed=self.seed,
-                                                patch_size=self.patch_size,
-                                                fill_values_to_nan=self.fill_values_to_nan,
-                                                max_nan_frac=self.max_nan_frac
-                                               )
+            self.train_ds = ArcticSeaIceIterableDataset(train_ice_charts[:ix_val_start],
+                                                        features=self.features,
+                                                        target=self.target,
+                                                        seed=self.seed,
+                                                        patch_size=self.patch_size,
+                                                        fill_values_to_nan=self.fill_values_to_nan,
+                                                        max_nan_frac=self.max_nan_frac
+                                                       )
             self.val_ds = ArcticSeaIceDataset(train_ice_charts[ix_val_start:],
                                               features=self.features,
                                               target=self.target,
@@ -219,10 +252,10 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                               )
 
     def train_dataloader(self):
-        return torch.utils.data.DataLoader(self.train_ds, self.batch_size)
+        return torch.utils.data.DataLoader( self.train_ds, batch_size=self.batch_size, shuffle=False,  num_workers=0, pin_memory=True)
 
     def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.val_ds, self.batch_size)
+        return torch.utils.data.DataLoader(self.val_ds, batch_size=1, shuffle=False, num_workers=0, pin_memory=True)
 
     def test_dataloader(self):
-        return torch.utils.data.DataLoader(self.test_ds, self.batch_size)
+        return torch.utils.data.DataLoader(self.test_ds, batch_size=1, shuffle=False, num_workers=0, pin_memory=True)
