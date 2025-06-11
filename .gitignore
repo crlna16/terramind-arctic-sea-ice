@@ -1,0 +1,9 @@
+data_IJGI18/
+showcase/
+data/
+files-*/
+sen1floods*/
+tif/
+*.sh
+*.txt
+output/
