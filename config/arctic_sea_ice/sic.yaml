@@ -1,0 +1,85 @@
+# lightning.pytorch==2.1.1
+seed_everything: 42
+trainer:
+  accelerator: auto
+  strategy: auto
+  devices: auto
+  num_nodes: 1
+  precision: 16-mixed
+  logger:
+    - class_path: lightning.pytorch.loggers.WandbLogger
+      init_args:
+        project: "arctic-sea-ice" 
+        name: "terramind-sic"
+        save_dir: "output/wandb"
+        log_model: true
+  callbacks:
+    - class_path: RichProgressBar
+    - class_path: LearningRateMonitor
+      init_args:
+        logging_interval: epoch
+  max_epochs: 100
+  log_every_n_steps: 5
+  default_root_dir: output/ArcticSeaIce-SIC/
+
+data:
+  class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
+  init_args:
+    batch_size: 8
+    num_workers: 8
+    data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
+    patch_size: 256
+    target: SIC
+
+model:
+  class_path: terratorch.tasks.SemanticSegmentationTask
+  init_args:
+    model_factory: EncoderDecoderFactory
+    model_args:
+      backbone: terramind_v1_base  # large version: terramind_v1_large
+      backbone_pretrained: true
+      backbone_modalities:
+        - S1GRD
+      backbone_merge_method: mean
+
+      necks:
+        - name: SelectIndices
+          indices: [2, 5, 8, 11]  # base version
+#          indices: [5, 11, 17, 23]  # large version
+        - name: ReshapeTokensToImage
+          remove_cls_token: False
+        - name: LearnedInterpolateToPyramidal
+
+      decoder: UNetDecoder
+      decoder_channels: [512, 256, 128, 64]
+
+      head_dropout: 0.1
+      num_classes: 11 
+    loss: ce 
+    ignore_index: -1
+    plot_on_val: false
+    freeze_backbone: false
+    freeze_decoder: false
+    class_names:
+      - C0
+      - C1
+      - C2
+      - C3
+      - C4
+      - C5
+      - C6
+      - C7
+      - C8
+      - C9
+      - C10
+
+optimizer:
+  class_path: torch.optim.AdamW
+  init_args:
+    lr: 1.0e-4
+lr_scheduler:
+  class_path: ReduceLROnPlateau
+  init_args:
+    monitor: val/loss
+    factor: 0.5
+    patience: 5

@@ -10,7 +10,7 @@ trainer:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
         project: "arctic-sea-ice" 
-        name: "terramind-sic"
+        name: "terramind-floe"
         save_dir: "output/wandb"
         log_model: true
   callbacks:
@@ -20,7 +20,7 @@ trainer:
         logging_interval: epoch
   max_epochs: 100
   log_every_n_steps: 5
-  default_root_dir: output/ArcticSeaIce-SIC/
+  default_root_dir: output/ArcticSeaIce-FLOE/
 
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
@@ -29,6 +29,7 @@ data:
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
     patch_size: 256
+    target: FLOE
 
 model:
   class_path: terratorch.tasks.SemanticSegmentationTask
@@ -53,24 +54,20 @@ model:
       decoder_channels: [512, 256, 128, 64]
 
       head_dropout: 0.1
-      num_classes: 11 
+      num_classes: 7
     loss: ce 
     ignore_index: -1
     plot_on_val: false
     freeze_backbone: false
     freeze_decoder: false
     class_names:
-      - C0
-      - C1
-      - C2
-      - C3
-      - C4
-      - C5
-      - C6
-      - C7
-      - C8
-      - C9
-      - C10
+      - "0: Open-water"
+      - "1: Cake ice"
+      - "2: Small floe"
+      - "3: Medium floe"
+      - "4: Big floe"
+      - "5: Vast floe"
+      - "6: Bergs"
 
 optimizer:
   class_path: torch.optim.AdamW
