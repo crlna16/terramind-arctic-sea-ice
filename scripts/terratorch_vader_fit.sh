@@ -8,4 +8,4 @@
 source ~/.bashrc
 conda activate terramind
 
-terratorch fit -c config/arctic_sea_ice/default.yaml --custom-modules-path="."
+terratorch fit -c config/arctic_sea_ice/default.yaml --custom_modules_path="/work/ka1176/caroline/gitlab/terramind-demo"

@@ -197,6 +197,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.fill_values_to_nan = fill_values_to_nan
         self.max_nan_frac = max_nan_frac
         self.batch_size = batch_size
+        self.num_workers = num_workers
         self.val_split = val_split
         self.test_split = test_split
         self.shuffle = shuffle
@@ -228,14 +229,14 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         fill_values_to_nan=self.fill_values_to_nan,
                                                         max_nan_frac=self.max_nan_frac
                                                        )
-            self.val_ds = ArcticSeaIceDataset(train_ice_charts[ix_val_start:],
-                                              features=self.features,
-                                              target=self.target,
-                                              seed=self.seed,
-                                              patch_size=self.patch_size,
-                                              fill_values_to_nan=self.fill_values_to_nan,
-                                              max_nan_frac=self.max_nan_frac
-                                             )
+            self.val_ds = ArcticSeaIceIterableDataset(train_ice_charts[ix_val_start:],
+                                                      features=self.features,
+                                                      target=self.target,
+                                                      seed=self.seed,
+                                                      patch_size=self.patch_size,
+                                                      fill_values_to_nan=self.fill_values_to_nan,
+                                                      max_nan_frac=self.max_nan_frac
+                                                     )
 
             print(f"Number of ice charts in train: {len(self.train_ds.ice_charts)}")
             print(f"Number of ice charts in validation: {len(self.val_ds.ice_charts)}")
