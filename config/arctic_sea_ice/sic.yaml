@@ -1,6 +1,7 @@
 # lightning.pytorch==2.1.1
 seed_everything: 42
 trainer:
+  fast_dev_run: false
   accelerator: auto
   strategy: auto
   devices: auto
@@ -35,7 +36,7 @@ data:
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
     patch_size: 384
-    avg_patches_per_chart: 10
+    avg_patches_per_chart: 1
     target: SIC
 
 model:

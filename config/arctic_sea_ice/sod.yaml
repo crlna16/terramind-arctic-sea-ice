@@ -1,6 +1,7 @@
 # lightning.pytorch==2.1.1
 seed_everything: 42
 trainer:
+  fast_dev_run: false
   accelerator: auto
   strategy: auto
   devices: auto
@@ -10,25 +11,19 @@ trainer:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
         project: "arctic-sea-ice" 
-        name: "terramind-sod"
-        save_dir: "output/wandb"
+        save_dir: "output/wandb/sod"
         log_model: true
-        config:  # Dataset parameters will be logged here
-          data:
-            features: ${data.init_args.features}
-            target: ${data.init_args.target}
-            patch_size: ${data.init_args.patch_size}
-            fill_values_to_nan: ${data.init_args.fill_values_to_nan}
-            max_nan_frac: ${data.init_args.max_nan_frac}
-            batch_size: ${data.init_args.batch_size}
-            num_workers: ${data.init_args.num_workers}
-            val_split: ${data.init_args.val_split}
-            shuffle: ${data.init_args.shuffle}
   callbacks:
     - class_path: RichProgressBar
     - class_path: LearningRateMonitor
       init_args:
         logging_interval: epoch
+    - class_path: src.utils.WandBConfigCallback
+    - class_path: ModelCheckpoint
+      init_args:
+        monitor: val/Multiclass_Jaccard_Index
+        mode: max
+        save_top_k: 1
   max_epochs: 100
   log_every_n_steps: 5
   default_root_dir: output/ArcticSeaIce-SOD/
@@ -36,11 +31,12 @@ trainer:
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
-    batch_size: 8
+    batch_size: 12 
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
-    patch_size: 256
-    target: SOD
+    patch_size: 384
+    avg_patches_per_chart: 1
+    target: SOD 
 
 model:
   class_path: terratorch.tasks.SemanticSegmentationTask
@@ -71,6 +67,12 @@ model:
     plot_on_val: false
     freeze_backbone: false
     freeze_decoder: false
+    tiled_inference_parameters:
+      h_crop: 512
+      h_stride: 496
+      w_crop: 512
+      w_stride: 496
+      average_patches: true
     class_names:
       - "0: Open-water"
       - "1: New ice"
