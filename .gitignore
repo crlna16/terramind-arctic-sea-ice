@@ -8,3 +8,4 @@ tif/
 *.txt
 output/
 *.out
+__pycache__/

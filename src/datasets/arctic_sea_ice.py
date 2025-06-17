@@ -25,7 +25,7 @@ class ArcticSeaIceBaseDataset(ABC):
                  seed = None,
                  patch_size: int = 256,
                  fill_values_to_nan: bool = True,
-                 max_nan_frac: float = 0.25
+                 max_nan_frac: float = 0.25,
                 ):
         """ArcticSeaIceBaseDataset
 
@@ -123,15 +123,32 @@ class ArcticSeaIceBaseDataset(ABC):
 
 class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
     '''Iterable dataset for Arctic sea ice charts.'''
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, 
+                 ice_charts: List[str],
+                 features: List[str] = ['nersc_sar_primary', 'nersc_sar_secondary'],
+                 target: str = "SIC", 
+                 seed = None,
+                 patch_size: int = 256,
+                 fill_values_to_nan: bool = True,
+                 max_nan_frac: float = 0.25,
+                 avg_patches_per_chart: int = 10
+                ):
+        super().__init__(ice_charts=ice_charts,
+                         features=features,
+                         target=target,
+                         seed=seed,
+                         patch_size=patch_size,
+                         fill_values_to_nan=fill_values_to_nan,
+                         max_nan_frac=max_nan_frac
+                         )
+        self.avg_patches_per_chart = avg_patches_per_chart
 
     def __len__(self):
         """Return the number of samples in the dataset."""
-        return len(self.ice_charts) * 10
+        return len(self.ice_charts) * self.avg_patches_per_chart
 
     def __iter__(self):
-        samples_per_epoch = len(self.ice_charts) * 10 
+        samples_per_epoch = len(self)
         
         for _ in range(samples_per_epoch):
             # choose random chart
@@ -188,7 +205,8 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  val_split: float = 0.1,
                  shuffle: bool = True,
                  means: List[float] = [-12.599, -20.293],
-                 stds: List[float] = [5.195, 5.890]
+                 stds: List[float] = [5.195, 5.890],
+                 avg_patches_per_chart: int = 10
                 ):
         super().__init__()
         self.data_root = data_root
@@ -204,6 +222,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.shuffle = shuffle
         self.means = means # TODO Use in dataset
         self.stds = stds # TODO Use in dataset
+        self.avg_patches_per_chart = avg_patches_per_chart
 
         # assigned in setup
         self.train_ds = None
@@ -228,7 +247,8 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         seed=self.seed,
                                                         patch_size=self.patch_size,
                                                         fill_values_to_nan=self.fill_values_to_nan,
-                                                        max_nan_frac=self.max_nan_frac
+                                                        max_nan_frac=self.max_nan_frac,
+                                                        avg_patches_per_chart=self.avg_patches_per_chart
                                                        )
             self.val_ds = ArcticSeaIceIterableDataset(train_ice_charts[ix_val_start:],
                                                       features=self.features,
@@ -236,7 +256,8 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                       seed=self.seed,
                                                       patch_size=self.patch_size,
                                                       fill_values_to_nan=self.fill_values_to_nan,
-                                                      max_nan_frac=self.max_nan_frac
+                                                      max_nan_frac=self.max_nan_frac,
+                                                      avg_patches_per_chart=self.avg_patches_per_chart
                                                      )
 
             logger.info(f"Number of ice charts in train: {len(self.train_ds.ice_charts)}")

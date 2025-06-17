@@ -1,5 +1,5 @@
 # lightning.pytorch==2.1.1
-seed_everything: 20250612
+seed_everything: 42
 trainer:
   accelerator: auto
   strategy: auto
@@ -13,6 +13,17 @@ trainer:
         name: "terramind-sod"
         save_dir: "output/wandb"
         log_model: true
+        config:  # Dataset parameters will be logged here
+          data:
+            features: ${data.init_args.features}
+            target: ${data.init_args.target}
+            patch_size: ${data.init_args.patch_size}
+            fill_values_to_nan: ${data.init_args.fill_values_to_nan}
+            max_nan_frac: ${data.init_args.max_nan_frac}
+            batch_size: ${data.init_args.batch_size}
+            num_workers: ${data.init_args.num_workers}
+            val_split: ${data.init_args.val_split}
+            shuffle: ${data.init_args.shuffle}
   callbacks:
     - class_path: RichProgressBar
     - class_path: LearningRateMonitor

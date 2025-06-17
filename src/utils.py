@@ -1,4 +1,5 @@
 from lightning.pytorch.callbacks import Callback
+import wandb
 
 class WandBConfigCallback(Callback):
     def setup(self, trainer, pl_module, stage=None):
@@ -9,27 +10,26 @@ class WandBConfigCallback(Callback):
         # Find WandB logger if present
         for logger in trainer.loggers:
             if 'WandbLogger' in str(type(logger)):
-                # Access datamodule parameters directly
-                datamodule = trainer.datamodule
-                
                 # Create config dict with actual values (no ${} substitution needed)
                 config = {
-                    "features": datamodule.features,
-                    "target": datamodule.target,
-                    "patch_size": datamodule.patch_size,
-                    "batch_size": datamodule.batch_size,
-                    "num_workers": datamodule.num_workers,
-                    "data_root": datamodule.data_root,
-                    "seed": datamodule.seed,
-                    "fill_values_to_nan": datamodule.fill_values_to_nan,
-                    "max_nan_frac": datamodule.max_nan_frac,
-                    "val_split": datamodule.val_split,
-                    "shuffle": datamodule.shuffle,
-                    "means": datamodule.means,
-                    "stds": datamodule.stds,
+                    "features": trainer.datamodule.features,
+                    "target": trainer.datamodule.target,
+                    "patch_size": trainer.datamodule.patch_size,
+                    "batch_size": trainer.datamodule.batch_size,
+                    "num_workers": trainer.datamodule.num_workers,
+                    "data_root": trainer.datamodule.data_root,
+                    "seed": trainer.datamodule.seed,
+                    "fill_values_to_nan": trainer.datamodule.fill_values_to_nan,
+                    "max_nan_frac": trainer.datamodule.max_nan_frac,
+                    "val_split": trainer.datamodule.val_split,
+                    "shuffle": trainer.datamodule.shuffle,
+                    "means": trainer.datamodule.means,
+                    "stds": trainer.datamodule.stds,
                     # Add other parameters you want to log
                 }
                 
-                # Update WandB config with resolved values
-                logger.experiment.config.update(config)
+                # Use wandb directly
+                if wandb.run is not None:
+                    wandb.config.update(config)
+                
                 break
