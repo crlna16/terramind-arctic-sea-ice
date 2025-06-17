@@ -10,6 +10,10 @@ from torch.utils.data import Dataset, IterableDataset
 import lightning as L
 import numpy as np
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ArcticSeaIceBaseDataset(ABC):
     '''
     Dataset for ready-to-train Arctic sea ice charts.
@@ -96,7 +100,7 @@ class ArcticSeaIceBaseDataset(ABC):
             else:
                 count += 1
 
-        print(f'Found patch in {count} steps')
+        logger.debug(f'Found patch in {count} steps')
         
         return patch
 
@@ -165,7 +169,6 @@ class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
                                 fill_values_to_nan=self.fill_values_to_nan
                                )
 
-        ds = self._select_patch(ds, 2048, seed=self.seed, max_nan_frac=1.0)
         # convert to tensors
         x, y = self._extract_tensors(ds, self.features, self.target)
     
@@ -183,7 +186,6 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  batch_size: int = 8,
                  num_workers: int = 8,
                  val_split: float = 0.1,
-                 test_split: float = 0.1,
                  shuffle: bool = True,
                  means: List[float] = [-12.599, -20.293],
                  stds: List[float] = [5.195, 5.890]
@@ -199,7 +201,6 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.val_split = val_split
-        self.test_split = test_split
         self.shuffle = shuffle
         self.means = means # TODO Use in dataset
         self.stds = stds # TODO Use in dataset
@@ -238,8 +239,8 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                       max_nan_frac=self.max_nan_frac
                                                      )
 
-            print(f"Number of ice charts in train: {len(self.train_ds.ice_charts)}")
-            print(f"Number of ice charts in validation: {len(self.val_ds.ice_charts)}")
+            logger.info(f"Number of ice charts in train: {len(self.train_ds.ice_charts)}")
+            logger.info(f"Number of ice charts in validation: {len(self.val_ds.ice_charts)}")
             
                                                 
         elif stage == "test":
