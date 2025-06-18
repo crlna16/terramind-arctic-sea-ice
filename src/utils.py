@@ -33,3 +33,9 @@ class WandBConfigCallback(Callback):
                     wandb.config.update(config)
                 
                 break
+
+class EpochShuffle(Callback):
+    def on_train_epoch_start(self, trainer, pl_module):
+        # Set epoch in the dataset
+        if hasattr(trainer.datamodule, "train_ds") and hasattr(trainer.datamodule.train_ds, "set_epoch"):
+            trainer.datamodule.train_ds.set_epoch(trainer.current_epoch)

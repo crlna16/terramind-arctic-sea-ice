@@ -190,7 +190,6 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                  patch_size: int = 256,
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25,
-                 avg_patches_per_chart: int = 10
                 ):
         super().__init__(ice_charts=ice_charts,
                          features=features,
@@ -200,32 +199,67 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                          fill_values_to_nan=fill_values_to_nan,
                          max_nan_frac=max_nan_frac
                          )
-        self.avg_patches_per_chart = avg_patches_per_chart
+        
+        self.epoch = 0  # Initialize epoch for reshuffling
+        self.orig_ice_charts = list(self.ice_charts)  # Keep original list of ice charts
+
+    def set_epoch(self, epoch):
+        """Set the epoch number to enable reshuffling."""
+        self.epoch = epoch
+        # Reshuffle ice charts using the epoch number and base seed
+        base_seed = self.seed if self.seed is not None else 42
+        epoch_seed = base_seed + self.epoch
+        
+        # Create a copy of the original charts
+        self.ice_charts = list(self.orig_ice_charts)
+        
+        # Shuffle using a deterministic random state based on epoch
+        rng = np.random.RandomState(epoch_seed)
+        rng.shuffle(self.ice_charts)
+        
+        print(f"Dataset reshuffled for epoch {epoch}, first chart: {os.path.basename(self.ice_charts[0])}")
 
     def __len__(self):
         """Return the number of samples in the dataset."""
-        return len(self.ice_charts) * self.avg_patches_per_chart
+        return len(self.ice_charts)
 
     def __iter__(self):
-        samples_per_epoch = len(self)
+        # Get worker info
+        worker_info = torch.utils.data.get_worker_info()
         
-        for _ in range(samples_per_epoch):
-            # choose random chart
-            ix = int(self.rng.random() * len(self.ice_charts))
+        # Determine which charts this worker should process
+        if worker_info is None:  # Single-process data loading
+            worker_id = 0
+            num_workers = 1
+        else:  # Multi-process data loading
+            worker_id = worker_info.id
+            num_workers = worker_info.num_workers
+        
+        # Split ice charts among workers
+        per_worker = int(np.ceil(len(self.ice_charts) / num_workers))
+        start_idx = worker_id * per_worker
+        end_idx = min(start_idx + per_worker, len(self.ice_charts))
+        
+        # Use only this worker's subset of charts
+        worker_charts = self.ice_charts[start_idx:end_idx]
+        logger.info(f"Worker {worker_id} processing {len(worker_charts)} charts out of {len(self.ice_charts)} total charts.")
+        
+        # Now iterate over just this worker's charts
+        for ice_chart in worker_charts:
+            ds = self._load_dataset(ice_chart, 
+                            self.features, 
+                            self.target,
+                            fill_values_to_nan=self.fill_values_to_nan
+                           )
             
-            ds = self._load_dataset(self.ice_charts[ix], 
-                                self.features, 
-                                self.target,
-                                fill_values_to_nan=self.fill_values_to_nan
-                               )
-
-            # select small patch
-            ds = self._select_patch(ds, self.patch_size, seed=self.seed, max_nan_frac=self.max_nan_frac)
-
-            # convert to tensors
-            x, y = self._extract_tensors(ds, self.features, self.target)
-        
-            yield {"image": x, "mask": y.squeeze()}
+            # Get tiles from this chart
+            tiles = self._get_tiles(ds, self.patch_size)
+            
+            # Yield each tile as a separate sample
+            for tile in tiles:
+                # Convert to tensors
+                x, y = self._extract_tensors(tile, self.features, self.target)
+                yield {"image": x, "mask": y.squeeze()}
 
 class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
     '''Dataset for inference on Arctic sea ice charts.'''
@@ -264,7 +298,6 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  shuffle: bool = True,
                  means: List[float] = [-12.599, -20.293],
                  stds: List[float] = [5.195, 5.890],
-                 avg_patches_per_chart: int = 10
                 ):
         super().__init__()
         self.data_root = data_root
@@ -279,7 +312,6 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.shuffle = shuffle
         self.means = means # TODO Use in dataset
         self.stds = stds # TODO Use in dataset
-        self.avg_patches_per_chart = avg_patches_per_chart
 
         # assigned in setup
         self.train_ds = None
@@ -306,7 +338,6 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         patch_size=self.patch_size,
                                                         fill_values_to_nan=self.fill_values_to_nan,
                                                         max_nan_frac=self.max_nan_frac,
-                                                        avg_patches_per_chart=self.avg_patches_per_chart
                                                        )
             self.val_ds = ArcticSeaIceValidationDataset(val_ice_charts,
                                                         features=self.features,
