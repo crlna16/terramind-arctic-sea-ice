@@ -47,6 +47,7 @@ data:
     patch_size: 512
     target: SIC
     samples_per_chart: 10
+    renormalize: true
 
 model:
   class_path: terratorch.tasks.SemanticSegmentationTask

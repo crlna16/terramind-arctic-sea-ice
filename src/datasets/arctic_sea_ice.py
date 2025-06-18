@@ -30,6 +30,7 @@ class ArcticSeaIceBaseDataset(ABC):
                  patch_size: int = 256,
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25,
+                 renormalize: bool = False,
                 ):
         """ArcticSeaIceBaseDataset
 
@@ -41,6 +42,7 @@ class ArcticSeaIceBaseDataset(ABC):
             patch_size (int, optional): Sample patch size. Defaults to 256.
             fill_values_to_nan (bool, optional): If True, replace fill values with NaN. Defaults to True.
             max_nan_frac (float, optional): Maximum fraction of NaN pixels accepted in a random patch. Defaults to 0.25.
+            renormalize (bool, optional): If True, renormalize tensors with Terramind stats. Defaults to False.
         """        
         super().__init__()
 
@@ -51,9 +53,18 @@ class ArcticSeaIceBaseDataset(ABC):
         self.patch_size = patch_size
         self.fill_values_to_nan = fill_values_to_nan
         self.max_nan_frac = max_nan_frac
+        self.renormalize = renormalize
 
         # random number generator for iterator
         self.rng = np.random.default_rng(seed=self.seed)
+
+        # fixed values
+        self.norm_values = {
+            'nersc_sar_primary': {'mean': -14.508, 'std': 5.660},
+            'nersc_sar_secondary': {'mean': -24.701, 'std': 4.747},
+            'terramind_VV': {'mean': -12.599, 'std': 5.195},
+            'terramind_VH': {'mean': -20.293, 'std': 5.890},
+        }
 
 
     @staticmethod
@@ -127,6 +138,21 @@ class ArcticSeaIceBaseDataset(ABC):
 
         return x, y
 
+    @staticmethod
+    def _renormalize_tensors(x, norm_values):
+        """Renormalize tensors with the stats from Terramind."""
+
+        # SAR channels were already mean/std normalized
+        # Retrieve original values
+        x[0] = x[0] * norm_values['nersc_sar_primary']['std'] + norm_values['nersc_sar_primary']['mean']
+        x[1] = x[1] * norm_values['nersc_sar_secondary']['std'] + norm_values['nersc_sar_secondary']['mean']
+
+        # Re-normalize to Terramind stats
+        x[0] = (x[0] - norm_values['terramind_VV']['mean']) / norm_values['terramind_VV']['std']
+        x[1] = (x[1] - norm_values['terramind_VH']['mean']) / norm_values['terramind_VH']['std']
+
+        return x
+
 class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
     '''Dataset for Arctic sea ice charts. Validation: Cover all ice charts.'''
     def __init__(self, 
@@ -137,6 +163,7 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
                  patch_size: int = 256,
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25,
+                 renormalize: bool = False,
                 ):
         super().__init__(ice_charts=ice_charts,
                          features=features,
@@ -145,6 +172,7 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
                          patch_size=patch_size,
                          fill_values_to_nan=fill_values_to_nan,
                          max_nan_frac=max_nan_frac,
+                         renormalize=renormalize,
                          )
 
         # read in all ice charts
@@ -185,6 +213,10 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
     def __getitem__(self, idx):
         """Return a single sample from the dataset."""
         x, y = self._extract_tensors(self.tiles[idx], self.features, self.target)
+
+        if self.renormalize:
+            x = self._renormalize_tensors(x, self.norm_values)
+
         return {"image": x, "mask": y.squeeze()}
 
 
@@ -199,7 +231,8 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25,
                  samples_per_chart: int = 10,
-                 augment: bool = True
+                 augment: bool = True,
+                 renormalize: bool = False,
                 ):
         super().__init__(ice_charts=ice_charts,
                          features=features,
@@ -207,7 +240,8 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                          seed=seed,
                          patch_size=patch_size,
                          fill_values_to_nan=fill_values_to_nan,
-                         max_nan_frac=max_nan_frac
+                         max_nan_frac=max_nan_frac,
+                         renormalize=renormalize,
                          )
         
         self.samples_per_chart = samples_per_chart  # Number of samples to take from each chart
@@ -287,6 +321,9 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
 
                 x, y = self.transforms(x, y)
 
+            if self.renormalize:
+                x = self._renormalize_tensors(x, self.norm_values)
+
             yield {"image": x, "mask": y.squeeze()}
 
 class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
@@ -309,6 +346,9 @@ class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
 
         # convert to tensors
         x, y = self._extract_tensors(ds, self.features, self.target)
+
+        if self.renormalize:
+            x = self._renormalize_tensors(x, self.norm_values)
     
         return {"image": x, "mask": y.squeeze()}
 
@@ -324,8 +364,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  batch_size: int = 8,
                  num_workers: int = 8,
                  shuffle: bool = True,
-                 means: List[float] = [-12.599, -20.293], # {'nersc_sar_primary': {'mean': -14.5082551552228, 'std': 5.6597459193818676}, 'nersc_sar_secondary': {'mean': -24.701205147144236, 'std': 4.746759305258515}
-                 stds: List[float] = [5.195, 5.890],
+                 renormalize: bool = True,
                  samples_per_chart: int = 10, # Only used in ArcticSeaIceIterableDataset
                  augment: bool = True, # Only used in ArcticSeaIceIterableDataset
                 ):
@@ -340,10 +379,10 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.shuffle = shuffle
-        self.means = means # TODO Use in dataset
-        self.stds = stds # TODO Use in dataset
+        self.renormalize = renormalize
         self.samples_per_chart = samples_per_chart  # Only used in ArcticSeaIceIterableDataset
         self.augment = augment  # Only used in ArcticSeaIceIterableDataset
+
 
         # assigned in setup
         self.train_ds = None
@@ -372,6 +411,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         max_nan_frac=self.max_nan_frac,
                                                         samples_per_chart=self.samples_per_chart,
                                                         augment=self.augment,
+                                                        renormalize=self.renormalize,
                                                        )
             self.val_ds = ArcticSeaIceValidationDataset(val_ice_charts,
                                                         features=self.features,
@@ -380,6 +420,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         patch_size=self.patch_size,
                                                         fill_values_to_nan=self.fill_values_to_nan,
                                                         max_nan_frac=self.max_nan_frac,
+                                                        renormalize=self.renormalize,
                                                        )
 
             print(f"Number of ice charts in train: {len(self.train_ds.ice_charts)}")
@@ -394,7 +435,8 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                seed=self.seed,
                                                patch_size=self.patch_size,
                                                fill_values_to_nan=self.fill_values_to_nan,
-                                               max_nan_frac=self.max_nan_frac
+                                               max_nan_frac=self.max_nan_frac,
+                                               renormalize=self.renormalize,
                                               )
 
     def train_dataloader(self):
