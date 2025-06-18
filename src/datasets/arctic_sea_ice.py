@@ -121,6 +121,65 @@ class ArcticSeaIceBaseDataset(ABC):
 
         return x, y
 
+class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
+    '''Dataset for Arctic sea ice charts. Validation: Cover all ice charts.'''
+    def __init__(self, 
+                 ice_charts: List[str],
+                 features: List[str] = ['nersc_sar_primary', 'nersc_sar_secondary'],
+                 target: str = "SIC", 
+                 seed = None,
+                 patch_size: int = 256,
+                 fill_values_to_nan: bool = True,
+                 max_nan_frac: float = 0.25,
+                ):
+        super().__init__(ice_charts=ice_charts,
+                         features=features,
+                         target=target,
+                         seed=seed,
+                         patch_size=patch_size,
+                         fill_values_to_nan=fill_values_to_nan,
+                         max_nan_frac=max_nan_frac,
+                         )
+
+        # read in all ice charts
+        logger.info(f"Loading {len(self.ice_charts)} ice charts for validation dataset")
+        tiles = []
+        for ice_chart in self.ice_charts:
+            ds = self._load_dataset(ice_chart, 
+                                    self.features, 
+                                    self.target,
+                                    fill_values_to_nan=self.fill_values_to_nan
+                                   )
+            # get tiles from dataset
+            tiles.extend(self._get_tiles(ds, self.patch_size))
+        
+        self.tiles = tiles
+        logger.info(f"Number of tiles in validation dataset: {len(self.tiles)}")
+
+    @staticmethod
+    def _get_tiles(ds, patch_size):
+        """Get tiles from dataset. Last pixels may be missing."""
+        xmax = len(ds.sar_samples) - patch_size
+        ymax = len(ds.sar_lines) - patch_size
+
+        tiles = []
+        for i in range(0, xmax, patch_size):
+            for j in range(0, ymax, patch_size):
+                tile = ds.isel(sar_samples=slice(i, i+patch_size), sar_lines=slice(j, j+patch_size))
+                tiles.append(tile)
+
+        return tiles
+
+    def __len__(self):
+        """Return the number of samples in the dataset."""
+        return len(self.tiles)
+
+    def __getitem__(self, idx):
+        """Return a single sample from the dataset."""
+        x, y = self._extract_tensors(self.tiles[idx], self.features, self.target)
+        return {"image": x, "mask": y.squeeze()}
+
+
 class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
     '''Iterable dataset for Arctic sea ice charts.'''
     def __init__(self, 
@@ -202,7 +261,6 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  max_nan_frac: float = 0.25,
                  batch_size: int = 8,
                  num_workers: int = 8,
-                 val_split: float = 0.1,
                  shuffle: bool = True,
                  means: List[float] = [-12.599, -20.293],
                  stds: List[float] = [5.195, 5.890],
@@ -218,7 +276,6 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.max_nan_frac = max_nan_frac
         self.batch_size = batch_size
         self.num_workers = num_workers
-        self.val_split = val_split
         self.shuffle = shuffle
         self.means = means # TODO Use in dataset
         self.stds = stds # TODO Use in dataset
@@ -237,11 +294,12 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
     def setup(self, stage="fit"):        
         if stage == "fit":
             train_ice_charts = [os.path.join(self.data_root, "train", f) for f in os.listdir(os.path.join(self.data_root, "train")) if f.endswith('.nc')]
+            val_ice_charts = [os.path.join(self.data_root, "val", f) for f in os.listdir(os.path.join(self.data_root, "val")) if f.endswith('.nc')]
+
             if self.shuffle:
                 self.rng.shuffle(train_ice_charts)
             
-            ix_val_start = int((1.0 - self.val_split) * len(train_ice_charts))
-            self.train_ds = ArcticSeaIceIterableDataset(train_ice_charts[:ix_val_start],
+            self.train_ds = ArcticSeaIceIterableDataset(train_ice_charts,
                                                         features=self.features,
                                                         target=self.target,
                                                         seed=self.seed,
@@ -250,21 +308,20 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         max_nan_frac=self.max_nan_frac,
                                                         avg_patches_per_chart=self.avg_patches_per_chart
                                                        )
-            self.val_ds = ArcticSeaIceIterableDataset(train_ice_charts[ix_val_start:],
-                                                      features=self.features,
-                                                      target=self.target,
-                                                      seed=self.seed,
-                                                      patch_size=self.patch_size,
-                                                      fill_values_to_nan=self.fill_values_to_nan,
-                                                      max_nan_frac=self.max_nan_frac,
-                                                      avg_patches_per_chart=self.avg_patches_per_chart
-                                                     )
+            self.val_ds = ArcticSeaIceValidationDataset(val_ice_charts,
+                                                        features=self.features,
+                                                        target=self.target,
+                                                        seed=self.seed,
+                                                        patch_size=self.patch_size,
+                                                        fill_values_to_nan=self.fill_values_to_nan,
+                                                        max_nan_frac=self.max_nan_frac,
+                                                       )
 
             logger.info(f"Number of ice charts in train: {len(self.train_ds.ice_charts)}")
             logger.info(f"Number of ice charts in validation: {len(self.val_ds.ice_charts)}")
             
                                                 
-        elif stage == "test":
+        elif stage == "test" or stage == "predict":
             test_ice_charts = [os.path.join(self.data_root, "test", f) for f in os.listdir(os.path.join(self.data_root, "test")) if f.endswith('.nc')]
             self.test_ds = ArcticSeaIceDataset(test_ice_charts,
                                                features=self.features,
@@ -276,10 +333,14 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                               )
 
     def train_dataloader(self):
+        # shuffling is handled in iterable dataset
         return torch.utils.data.DataLoader( self.train_ds, batch_size=self.batch_size, shuffle=False,  num_workers=self.num_workers, pin_memory=True)
 
     def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.val_ds, batch_size=1, shuffle=False, num_workers=self.num_workers, pin_memory=True)
+        return torch.utils.data.DataLoader(self.val_ds, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=True)
 
     def test_dataloader(self):
+        return torch.utils.data.DataLoader(self.test_ds, batch_size=1, shuffle=False, num_workers=self.num_workers, pin_memory=True)
+
+    def predict_dataloader(self):
         return torch.utils.data.DataLoader(self.test_ds, batch_size=1, shuffle=False, num_workers=self.num_workers, pin_memory=True)

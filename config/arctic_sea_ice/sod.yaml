@@ -35,7 +35,7 @@ data:
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
     patch_size: 384
-    avg_patches_per_chart: 1
+    avg_patches_per_chart: 20
     target: SOD 
 
 model:
