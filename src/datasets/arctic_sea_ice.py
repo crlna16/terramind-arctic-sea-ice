@@ -65,14 +65,14 @@ class ArcticSeaIceBaseDataset(ABC):
         Returns:
             xr.Dataset: Dataset with selected features and target variable.
         """        
-        ds = xr.open_dataset(path)
+        with xr.open_dataset(path) as ds:
 
-        if fill_values_to_nan:
-            ds['nersc_sar_primary'] = xr.where(ds['nersc_sar_primary'] != 0, ds['nersc_sar_primary'], None)
-            ds['nersc_sar_secondary'] = xr.where(ds['nersc_sar_secondary'] != 0, ds['nersc_sar_secondary'], None)
-            ds[target] = xr.where(ds[target] != 255, ds[target], None)
+            if fill_values_to_nan:
+                ds['nersc_sar_primary'] = xr.where(ds['nersc_sar_primary'] != 0, ds['nersc_sar_primary'], None)
+                ds['nersc_sar_secondary'] = xr.where(ds['nersc_sar_secondary'] != 0, ds['nersc_sar_secondary'], None)
+                ds[target] = xr.where(ds[target] != 255, ds[target], None)
 
-        return ds[features + [target]]
+            return ds[features + [target]]
 
     @staticmethod
     def _select_patch(ds, patch_size, var='nersc_sar_primary', seed=None, max_nan_frac=0.25):
@@ -152,22 +152,24 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
                                     self.target,
                                     fill_values_to_nan=self.fill_values_to_nan
                                    )
-            # get tiles from dataset
-            tiles.extend(self._get_tiles(ds, self.patch_size))
+
+            tiles.extend(self._get_tiles(ds))
         
         self.tiles = tiles
         print(f"Number of tiles in validation dataset: {len(self.tiles)}")
 
-    @staticmethod
-    def _get_tiles(ds, patch_size):
+    def _get_tiles(self, ds):
         """Get tiles from dataset. Last pixels may be missing."""
-        xmax = len(ds.sar_samples) - patch_size
-        ymax = len(ds.sar_lines) - patch_size
+        xmax = len(ds.sar_samples) - self.patch_size
+        ymax = len(ds.sar_lines) - self.patch_size
 
         tiles = []
-        for i in range(0, xmax, patch_size):
-            for j in range(0, ymax, patch_size):
-                tile = ds.isel(sar_samples=slice(i, i+patch_size), sar_lines=slice(j, j+patch_size))
+        for i in range(0, xmax, self.patch_size):
+            for j in range(0, ymax, self.patch_size):
+                tile = ds.isel(sar_samples=slice(i, i+self.patch_size), sar_lines=slice(j, j+self.patch_size))
+                if np.all(np.isnan(tile[self.target].values)):
+                    print(f"Skipping tile at ({i}, {j}) with all NaN values in target.")
+                    continue
                 tiles.append(tile)
 
         return tiles
