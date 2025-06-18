@@ -281,11 +281,11 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
             x, y, = self._extract_tensors(patch, self.features, self.target)
 
             # Data augmentation
-            if self.augment:
+            if self.augment and self.transforms is not None:
                 x = tv_tensors.Image(x)
                 y = tv_tensors.Mask(y)
 
-
+                x, y = self.transforms(x, y)
 
             yield {"image": x, "mask": y.squeeze()}
 

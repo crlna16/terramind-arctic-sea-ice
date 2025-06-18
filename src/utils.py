@@ -21,8 +21,8 @@ class WandBConfigCallback(Callback):
                     "seed": trainer.datamodule.seed,
                     "fill_values_to_nan": trainer.datamodule.fill_values_to_nan,
                     "max_nan_frac": trainer.datamodule.max_nan_frac,
-                    "val_split": trainer.datamodule.val_split,
                     "shuffle": trainer.datamodule.shuffle,
+                    "samples_per_chart": trainer.datamodule.samples_per_chart,
                     "means": trainer.datamodule.means,
                     "stds": trainer.datamodule.stds,
                     # Add other parameters you want to log
