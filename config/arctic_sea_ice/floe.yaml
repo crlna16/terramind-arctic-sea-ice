@@ -14,7 +14,7 @@ trainer:
         save_dir: "output/wandb/floe"
         log_model: true
   callbacks:
-    - class_path: src.callbacks.EpochShuffle  # Your custom callback
+    - class_path: src.utils.EpochShuffle
     - class_path: RichProgressBar
     - class_path: LearningRateMonitor
       init_args:

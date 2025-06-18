@@ -83,12 +83,13 @@ class ArcticSeaIceBaseDataset(ABC):
 
         # fall back patch
         patch = ds.isel(sar_samples=slice(0, patch_size), sar_lines=slice(0, patch_size))
+        max_lookups = 100
 
         rng = np.random.default_rng(seed=seed)
 
         looking_for_patch = True
         count = 0
-        while looking_for_patch:
+        while looking_for_patch and count < max_lookups:
             i = int(rng.random() * xmax)
             j = int(rng.random() * ymax)
 
@@ -100,7 +101,8 @@ class ArcticSeaIceBaseDataset(ABC):
             else:
                 count += 1
 
-        logger.debug(f'Found patch in {count} steps')
+        if count == max_lookups:
+            logger.warning(f'Could not find a patch with less than {max_nan_frac} NaN pixels in {max_lookups} attempts. Using fallback patch.')
         
         return patch
 
@@ -142,7 +144,7 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
                          )
 
         # read in all ice charts
-        logger.info(f"Loading {len(self.ice_charts)} ice charts for validation dataset")
+        print(f"Loading {len(self.ice_charts)} ice charts for validation dataset")
         tiles = []
         for ice_chart in self.ice_charts:
             ds = self._load_dataset(ice_chart, 
@@ -154,7 +156,7 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
             tiles.extend(self._get_tiles(ds, self.patch_size))
         
         self.tiles = tiles
-        logger.info(f"Number of tiles in validation dataset: {len(self.tiles)}")
+        print(f"Number of tiles in validation dataset: {len(self.tiles)}")
 
     @staticmethod
     def _get_tiles(ds, patch_size):
@@ -242,24 +244,21 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
         
         # Use only this worker's subset of charts
         worker_charts = self.ice_charts[start_idx:end_idx]
-        logger.info(f"Worker {worker_id} processing {len(worker_charts)} charts out of {len(self.ice_charts)} total charts.")
+        print(f"Worker {worker_id} processing {len(worker_charts)} charts out of {len(self.ice_charts)} total charts.")
         
         # Now iterate over just this worker's charts
         for ice_chart in worker_charts:
+            print(f"Worker {worker_id} processing chart: {os.path.basename(ice_chart)}")
             ds = self._load_dataset(ice_chart, 
                             self.features, 
                             self.target,
                             fill_values_to_nan=self.fill_values_to_nan
                            )
             
-            # Get tiles from this chart
-            tiles = self._get_tiles(ds, self.patch_size)
-            
-            # Yield each tile as a separate sample
-            for tile in tiles:
-                # Convert to tensors
-                x, y = self._extract_tensors(tile, self.features, self.target)
-                yield {"image": x, "mask": y.squeeze()}
+            patch = self._select_patch(ds, self.patch_size, var=self.features[0], seed=self.seed, max_nan_frac=self.max_nan_frac)
+            x, y, = self._extract_tensors(patch, self.features, self.target)
+
+            yield {"image": x, "mask": y.squeeze()}
 
 class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
     '''Dataset for inference on Arctic sea ice charts.'''
@@ -348,8 +347,8 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         max_nan_frac=self.max_nan_frac,
                                                        )
 
-            logger.info(f"Number of ice charts in train: {len(self.train_ds.ice_charts)}")
-            logger.info(f"Number of ice charts in validation: {len(self.val_ds.ice_charts)}")
+            print(f"Number of ice charts in train: {len(self.train_ds.ice_charts)}")
+            print(f"Number of ice charts in validation: {len(self.val_ds.ice_charts)}")
             
                                                 
         elif stage == "test" or stage == "predict":
