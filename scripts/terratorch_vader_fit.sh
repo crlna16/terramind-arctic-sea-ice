@@ -10,4 +10,4 @@
 source ~/.bashrc
 conda activate terramind
 
-terratorch fit -c config/arctic_sea_ice/floe.yaml --custom_modules_path="/work/ka1176/caroline/gitlab/terramind-demo"
+terratorch fit -c config/arctic_sea_ice/sic.yaml --custom_modules_path="/work/ka1176/caroline/gitlab/terramind-demo" 

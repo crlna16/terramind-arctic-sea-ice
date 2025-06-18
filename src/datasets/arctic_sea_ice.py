@@ -10,6 +10,10 @@ from torch.utils.data import Dataset, IterableDataset
 import lightning as L
 import numpy as np
 
+from torchvision import tv_tensors
+from torchvision.transforms import v2
+
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -168,7 +172,7 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
             for j in range(0, ymax, self.patch_size):
                 tile = ds.isel(sar_samples=slice(i, i+self.patch_size), sar_lines=slice(j, j+self.patch_size))
                 if np.all(np.isnan(tile[self.target].values)):
-                    print(f"Skipping tile at ({i}, {j}) with all NaN values in target.")
+                    logger.debug(f"Skipping tile at ({i}, {j}) with all NaN values in target.")
                     continue
                 tiles.append(tile)
 
@@ -195,6 +199,7 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25,
                  samples_per_chart: int = 10,
+                 augment: bool = True
                 ):
         super().__init__(ice_charts=ice_charts,
                          features=features,
@@ -206,11 +211,21 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                          )
         
         self.samples_per_chart = samples_per_chart  # Number of samples to take from each chart
+        self.augment = augment  # Whether to apply data augmentation
         self.epoch = 0  # Initialize epoch for reshuffling
 
         print(f"Using {self.samples_per_chart} samples per chart with {len(self.ice_charts)} ice charts.")
         self.orig_ice_charts = list(self.ice_charts) * self.samples_per_chart  # Keep original list of ice charts
         print(f"Total number of ice charts in dataset: {len(self.orig_ice_charts)}")
+
+        if self.augment:
+            print("Data augmentation: horizontal and vertical flips")
+            self.transforms = v2.Compose([
+                v2.RandomHorizontalFlip(),
+                v2.RandomVerticalFlip(),
+            ])
+        else:
+            self.transforms = None
 
     def set_epoch(self, epoch):
         """Set the epoch number to enable reshuffling."""
@@ -251,7 +266,7 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
         
         # Use only this worker's subset of charts
         worker_charts = self.ice_charts[start_idx:end_idx]
-        print(f"Worker {worker_id} processing {len(worker_charts)} charts out of {len(self.ice_charts)} total charts.")
+        logger.debug(f"Worker {worker_id} processing {len(worker_charts)} charts out of {len(self.ice_charts)} total charts.")
         
         # Now iterate over just this worker's charts
         for ice_chart in worker_charts:
@@ -262,8 +277,15 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                             fill_values_to_nan=self.fill_values_to_nan
                            )
             
-            patch = self._select_patch(ds, self.patch_size, var=self.features[0], seed=self.seed, max_nan_frac=self.max_nan_frac)
+            patch = self._select_patch(ds, self.patch_size, var=self.target, seed=self.seed, max_nan_frac=self.max_nan_frac)
             x, y, = self._extract_tensors(patch, self.features, self.target)
+
+            # Data augmentation
+            if self.augment:
+                x = tv_tensors.Image(x)
+                y = tv_tensors.Mask(y)
+
+
 
             yield {"image": x, "mask": y.squeeze()}
 
@@ -302,9 +324,10 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  batch_size: int = 8,
                  num_workers: int = 8,
                  shuffle: bool = True,
-                 means: List[float] = [-12.599, -20.293],
+                 means: List[float] = [-12.599, -20.293], # {'nersc_sar_primary': {'mean': -14.5082551552228, 'std': 5.6597459193818676}, 'nersc_sar_secondary': {'mean': -24.701205147144236, 'std': 4.746759305258515}
                  stds: List[float] = [5.195, 5.890],
                  samples_per_chart: int = 10, # Only used in ArcticSeaIceIterableDataset
+                 augment: bool = True, # Only used in ArcticSeaIceIterableDataset
                 ):
         super().__init__()
         self.data_root = data_root
@@ -320,6 +343,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.means = means # TODO Use in dataset
         self.stds = stds # TODO Use in dataset
         self.samples_per_chart = samples_per_chart  # Only used in ArcticSeaIceIterableDataset
+        self.augment = augment  # Only used in ArcticSeaIceIterableDataset
 
         # assigned in setup
         self.train_ds = None
@@ -347,6 +371,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         fill_values_to_nan=self.fill_values_to_nan,
                                                         max_nan_frac=self.max_nan_frac,
                                                         samples_per_chart=self.samples_per_chart,
+                                                        augment=self.augment,
                                                        )
             self.val_ds = ArcticSeaIceValidationDataset(val_ice_charts,
                                                         features=self.features,
