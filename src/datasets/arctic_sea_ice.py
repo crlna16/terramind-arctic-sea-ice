@@ -192,6 +192,7 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                  patch_size: int = 256,
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25,
+                 samples_per_chart: int = 10,
                 ):
         super().__init__(ice_charts=ice_charts,
                          features=features,
@@ -202,8 +203,12 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                          max_nan_frac=max_nan_frac
                          )
         
+        self.samples_per_chart = samples_per_chart  # Number of samples to take from each chart
         self.epoch = 0  # Initialize epoch for reshuffling
-        self.orig_ice_charts = list(self.ice_charts)  # Keep original list of ice charts
+
+        print(f"Using {self.samples_per_chart} samples per chart with {len(self.ice_charts)} ice charts.")
+        self.orig_ice_charts = list(self.ice_charts) * self.samples_per_chart  # Keep original list of ice charts
+        print(f"Total number of ice charts in dataset: {len(self.orig_ice_charts)}")
 
     def set_epoch(self, epoch):
         """Set the epoch number to enable reshuffling."""
@@ -223,7 +228,7 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
 
     def __len__(self):
         """Return the number of samples in the dataset."""
-        return len(self.ice_charts)
+        return len(self.orig_ice_charts)
 
     def __iter__(self):
         # Get worker info
@@ -248,7 +253,7 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
         
         # Now iterate over just this worker's charts
         for ice_chart in worker_charts:
-            print(f"Worker {worker_id} processing chart: {os.path.basename(ice_chart)}")
+            #print(f"Worker {worker_id} processing chart: {os.path.basename(ice_chart)}")
             ds = self._load_dataset(ice_chart, 
                             self.features, 
                             self.target,
@@ -297,6 +302,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  shuffle: bool = True,
                  means: List[float] = [-12.599, -20.293],
                  stds: List[float] = [5.195, 5.890],
+                 samples_per_chart: int = 10, # Only used in ArcticSeaIceIterableDataset
                 ):
         super().__init__()
         self.data_root = data_root
@@ -311,6 +317,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.shuffle = shuffle
         self.means = means # TODO Use in dataset
         self.stds = stds # TODO Use in dataset
+        self.samples_per_chart = samples_per_chart  # Only used in ArcticSeaIceIterableDataset
 
         # assigned in setup
         self.train_ds = None
@@ -337,6 +344,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         patch_size=self.patch_size,
                                                         fill_values_to_nan=self.fill_values_to_nan,
                                                         max_nan_frac=self.max_nan_frac,
+                                                        samples_per_chart=self.samples_per_chart,
                                                        )
             self.val_ds = ArcticSeaIceValidationDataset(val_ice_charts,
                                                         features=self.features,
