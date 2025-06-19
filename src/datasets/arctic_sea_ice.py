@@ -31,6 +31,7 @@ class ArcticSeaIceBaseDataset(ABC):
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25,
                  renormalize: bool = False,
+                 return_chart_name: bool = False,
                 ):
         """ArcticSeaIceBaseDataset
 
@@ -43,6 +44,7 @@ class ArcticSeaIceBaseDataset(ABC):
             fill_values_to_nan (bool, optional): If True, replace fill values with NaN. Defaults to True.
             max_nan_frac (float, optional): Maximum fraction of NaN pixels accepted in a random patch. Defaults to 0.25.
             renormalize (bool, optional): If True, renormalize tensors with Terramind stats. Defaults to False.
+            return_chart_name (bool, optional): If True, return the ice chart name in the output. Defaults to False.
         """        
         super().__init__()
 
@@ -54,6 +56,7 @@ class ArcticSeaIceBaseDataset(ABC):
         self.fill_values_to_nan = fill_values_to_nan
         self.max_nan_frac = max_nan_frac
         self.renormalize = renormalize
+        self.return_chart_name = return_chart_name
 
         # random number generator for iterator
         self.rng = np.random.default_rng(seed=self.seed)
@@ -164,6 +167,7 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
                  fill_values_to_nan: bool = True,
                  max_nan_frac: float = 0.25,
                  renormalize: bool = False,
+                 return_chart_name: bool = False,
                 ):
         super().__init__(ice_charts=ice_charts,
                          features=features,
@@ -173,6 +177,7 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
                          fill_values_to_nan=fill_values_to_nan,
                          max_nan_frac=max_nan_frac,
                          renormalize=renormalize,
+                         return_chart_name=return_chart_name,
                          )
 
         # read in all ice charts
@@ -236,6 +241,7 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                  samples_per_chart: int = 10,
                  augment: bool = True,
                  renormalize: bool = False,
+                 return_chart_name: bool = False,
                 ):
         super().__init__(ice_charts=ice_charts,
                          features=features,
@@ -245,6 +251,7 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                          fill_values_to_nan=fill_values_to_nan,
                          max_nan_frac=max_nan_frac,
                          renormalize=renormalize,
+                         return_chart_name=return_chart_name
                          )
         
         self.samples_per_chart = samples_per_chart  # Number of samples to take from each chart
