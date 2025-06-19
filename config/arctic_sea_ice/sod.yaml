@@ -44,7 +44,7 @@ data:
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
     patch_size: 512
-    target: FLOE
+    target: SOD
     samples_per_chart: 10
     renormalize: true
 

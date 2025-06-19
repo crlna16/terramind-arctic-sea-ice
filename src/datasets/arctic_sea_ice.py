@@ -217,6 +217,9 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
         if self.renormalize:
             x = self._renormalize_tensors(x, self.norm_values)
 
+        if self.return_chart_name:
+            return {"image": x, "mask": y.squeeze(), "ice_chart": os.path.basename(self.ice_charts[idx])}
+
         return {"image": x, "mask": y.squeeze()}
 
 
@@ -324,6 +327,9 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
             if self.renormalize:
                 x = self._renormalize_tensors(x, self.norm_values)
 
+            if self.return_chart_name:
+                yield {"image": x, "mask": y.squeeze(), "ice_chart": os.path.basename(ice_chart)}
+
             yield {"image": x, "mask": y.squeeze()}
 
 class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
@@ -350,6 +356,9 @@ class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
         if self.renormalize:
             x = self._renormalize_tensors(x, self.norm_values)
     
+        if self.return_chart_name:
+            return {"image": x, "mask": y.squeeze(), "ice_chart": os.path.basename(self.ice_charts[idx])}
+
         return {"image": x, "mask": y.squeeze()}
 
 class ArcticSeaIceDataModule(L.LightningDataModule):
@@ -367,6 +376,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  renormalize: bool = True,
                  samples_per_chart: int = 10, # Only used in ArcticSeaIceIterableDataset
                  augment: bool = True, # Only used in ArcticSeaIceIterableDataset
+                 return_chart_name: bool = False
                 ):
         super().__init__()
         self.data_root = data_root
@@ -382,6 +392,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.renormalize = renormalize
         self.samples_per_chart = samples_per_chart  # Only used in ArcticSeaIceIterableDataset
         self.augment = augment  # Only used in ArcticSeaIceIterableDataset
+        self.return_chart_name = return_chart_name
 
 
         # assigned in setup
@@ -412,6 +423,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         samples_per_chart=self.samples_per_chart,
                                                         augment=self.augment,
                                                         renormalize=self.renormalize,
+                                                        return_chart_name=self.return_chart_name,
                                                        )
             self.val_ds = ArcticSeaIceValidationDataset(val_ice_charts,
                                                         features=self.features,
@@ -421,6 +433,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                         fill_values_to_nan=self.fill_values_to_nan,
                                                         max_nan_frac=self.max_nan_frac,
                                                         renormalize=self.renormalize,
+                                                        return_chart_name=self.return_chart_name,
                                                        )
 
             print(f"Number of ice charts in train: {len(self.train_ds.ice_charts)}")
@@ -437,6 +450,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                fill_values_to_nan=self.fill_values_to_nan,
                                                max_nan_frac=self.max_nan_frac,
                                                renormalize=self.renormalize,
+                                               return_chart_name=self.return_chart_name,
                                               )
 
     def train_dataloader(self):

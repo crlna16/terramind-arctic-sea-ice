@@ -23,8 +23,8 @@ class WandBConfigCallback(Callback):
                     "max_nan_frac": trainer.datamodule.max_nan_frac,
                     "shuffle": trainer.datamodule.shuffle,
                     "samples_per_chart": trainer.datamodule.samples_per_chart,
-                    "means": trainer.datamodule.means,
-                    "stds": trainer.datamodule.stds,
+                    "renormalize": trainer.datamodule.renormalize,
+                    "augment": trainer.datamodule.augment,
                     # Add other parameters you want to log
                 }
                 

@@ -12,6 +12,14 @@ Idea: Predict sea ice type
 - SIC could also be considered a pixel-wise regression task
 - Explore thinking in modalities
 
+Comparison
+---
+
+1. Terramind zero-shot
+2. Terramind with fine tuning
+3. Terramind with thinking in modalities
+4. Training U-Net from scratch
+
 
 ## Other ideas
 ### Crop type
