@@ -34,17 +34,17 @@ trainer:
         min_delta: 0.0005
         strict: false
         check_on_train_epoch_end: false
-  max_epochs: 30
+  max_epochs: 100
   log_every_n_steps: 5
   default_root_dir: output/ArcticSeaIce-SIC/
 
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
-    batch_size: 24
+    batch_size: 32
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
-    patch_size: 512
+    patch_size: 768
     target: SIC
     samples_per_chart: 10
     renormalize: true
@@ -57,6 +57,14 @@ model:
       backbone: UNet
       backbone_pretrained: None
       backbone_in_channels: 2
+      backbone_out_channels: 16
+      backbone_num_stages: 8
+      backbone_strides: [1, 1, 1, 1, 1, 1, 1, 1]
+      backbone_enc_num_convs: [2, 2, 2, 2, 2, 2, 2, 2]
+      backbone_enc_dilations: [1, 1, 1, 1, 1, 1, 1, 1]
+      backbone_dec_num_convs: [2, 2, 2, 2, 2, 2, 2]
+      backbone_dec_dilations: [1, 1, 1, 1, 1, 1, 1]
+      backbone_downsamples: [true, true, true, true, true, true, true]
 
       decoder: IdentityDecoder
 
@@ -102,7 +110,7 @@ model:
 optimizer:
   class_path: torch.optim.AdamW
   init_args:
-    lr: 2.0e-5
+    lr: 1.0e-3
 lr_scheduler:
   class_path: ReduceLROnPlateau
   init_args:

@@ -351,22 +351,44 @@ class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
     def __getitem__(self, idx):
         """Get a full patch from the dataset"""
 
-        ds = self._load_dataset(self.ice_charts[idx],
-                                self.features, 
-                                self.target,
-                                fill_values_to_nan=self.fill_values_to_nan
-                               )
+        if self.target is not None:
+            # labels available
+            ds = self._load_dataset(self.ice_charts[idx],
+                                    self.features, 
+                                    self.target,
+                                    fill_values_to_nan=self.fill_values_to_nan
+                                    )
 
-        # convert to tensors
-        x, y = self._extract_tensors(ds, self.features, self.target)
-
-        if self.renormalize:
-            x = self._renormalize_tensors(x, self.norm_values)
+            # convert to tensors
+            x, y = self._extract_tensors(ds, self.features, self.target)
     
-        if self.return_chart_name:
-            return {"image": x, "mask": y.squeeze(), "ice_chart": os.path.basename(self.ice_charts[idx])}
+            if self.renormalize:
+                x = self._renormalize_tensors(x, self.norm_values)
+    
+            if self.return_chart_name:
+                return {"image": x, "mask": y.squeeze(), "ice_chart": os.path.basename(self.ice_charts[idx])}
 
-        return {"image": x, "mask": y.squeeze()}
+            return {"image": x, "mask": y.squeeze()}
+
+        else:
+            # labels not available
+            ds = self._load_dataset(self.ice_charts[idx],
+                                    self.features, 
+                                    self.features[0],  # Use the first feature as a placeholder
+                                    fill_values_to_nan=self.fill_values_to_nan
+                                    )
+
+            # convert to tensors
+            x, y = self._extract_tensors(ds, self.features, self.features[0])
+    
+            if self.renormalize:
+                x = self._renormalize_tensors(x, self.norm_values)
+    
+            if self.return_chart_name:
+                return {"image": x, "ice_chart": os.path.basename(self.ice_charts[idx])}
+
+            return {"image": x}
+
 
 class ArcticSeaIceDataModule(L.LightningDataModule):
     def __init__(self,
@@ -447,7 +469,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
             print(f"Number of ice charts in validation: {len(self.val_ds.ice_charts)}")
             
                                                 
-        elif stage == "test" or stage == "predict":
+        elif stage == "test":
             test_ice_charts = [os.path.join(self.data_root, "test", f) for f in os.listdir(os.path.join(self.data_root, "test")) if f.endswith('.nc')]
             self.test_ds = ArcticSeaIceDataset(test_ice_charts,
                                                features=self.features,
@@ -459,6 +481,18 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                renormalize=self.renormalize,
                                                return_chart_name=self.return_chart_name,
                                               )
+        elif stage == "predict":
+            predict_ice_charts = [os.path.join(self.data_root, "predict", f) for f in os.listdir(os.path.join(self.data_root, "predict")) if f.endswith('_prep.nc')]
+            self.predict_ds = ArcticSeaIceDataset(predict_ice_charts,
+                                                  features=self.features,
+                                                  target=None,
+                                                  seed=self.seed,
+                                                  patch_size=self.patch_size,
+                                                  fill_values_to_nan=self.fill_values_to_nan,
+                                                  max_nan_frac=self.max_nan_frac,
+                                                  renormalize=self.renormalize,
+                                                  return_chart_name=self.return_chart_name,
+                                                 )
 
     def train_dataloader(self):
         # shuffling is handled in iterable dataset
@@ -471,4 +505,4 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         return torch.utils.data.DataLoader(self.test_ds, batch_size=1, shuffle=False, num_workers=self.num_workers, pin_memory=True)
 
     def predict_dataloader(self):
-        return torch.utils.data.DataLoader(self.test_ds, batch_size=1, shuffle=False, num_workers=self.num_workers, pin_memory=True)
+        return torch.utils.data.DataLoader(self.predict_ds, batch_size=1, shuffle=False, num_workers=self.num_workers, pin_memory=True)

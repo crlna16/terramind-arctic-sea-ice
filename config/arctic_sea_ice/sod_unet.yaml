@@ -36,16 +36,16 @@ trainer:
         check_on_train_epoch_end: false
   max_epochs: 100
   log_every_n_steps: 5
-  default_root_dir: output/ArcticSeaIce-SIC/
+  default_root_dir: output/ArcticSeaIce-SOD/
 
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
-    batch_size: 10
+    batch_size: 24
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
-    patch_size: 384
-    target: SIC
+    patch_size: 512
+    target: SOD
     samples_per_chart: 10
     renormalize: true
 
@@ -54,39 +54,17 @@ model:
   init_args:
     model_factory: EncoderDecoderFactory
     model_args:
-      backbone: terramind_v1_base  # large version: terramind_v1_large
-      backbone_pretrained: true
-      backbone_modalities:
-        - S1GRD
-      backbone_merge_method: mean
+      backbone: UNet
+      backbone_pretrained: None
+      backbone_in_channels: 2
 
-      necks:
-        - name: SelectIndices
-          indices: [2, 5, 8, 11]  # base version
-#          indices: [5, 11, 17, 23]  # large version
-        - name: ReshapeTokensToImage
-          remove_cls_token: False
-        - name: LearnedInterpolateToPyramidal
-
-      decoder: UNetDecoder
-      decoder_channels: [512, 256, 128, 64]
+      decoder: IdentityDecoder
 
       head_dropout: 0.1
-      num_classes: 11 
+      num_classes: 6 
     loss: ce 
     ignore_index: -1
-    class_weights:
-      - 0.03048606
-      - 0.2155147
-      - 0.05279231
-      - 0.07369071
-      - 0.11573942
-      - 0.06410955
-      - 0.21568525
-      - 0.07966561
-      - 0.06758043
-      - 0.04544184
-      - 0.03929412
+    class_weights: [0.02011758, 0.03622458, 0.38787555, 0.15434656, 0.01378431, 0.38765142]
     plot_on_val: false
     freeze_backbone: false
     freeze_decoder: false
@@ -98,22 +76,17 @@ model:
       w_stride: 256
       average_patches: true
     class_names:
-      - "SIC 0/10"
-      - "SIC 1/10"
-      - "SIC 2/10"
-      - "SIC 3/10"
-      - "SIC 4/10"
-      - "SIC 5/10"
-      - "SIC 6/10"
-      - "SIC 7/10"
-      - "SIC 8/10"
-      - "SIC 9/10"
-      - "SIC 10/10"
+      - "0: Open-water"
+      - "1: New ice"
+      - "2: Young ice"
+      - "3: Thin First-year ice"
+      - "4: Thick First-year ice"
+      - "5: Old ice"
 
 optimizer:
   class_path: torch.optim.AdamW
   init_args:
-    lr: 2.0e-5
+    lr: 1.0e-3
 lr_scheduler:
   class_path: ReduceLROnPlateau
   init_args:

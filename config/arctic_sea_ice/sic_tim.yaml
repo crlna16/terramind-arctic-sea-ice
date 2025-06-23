@@ -41,7 +41,7 @@ trainer:
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
-    batch_size: 10
+    batch_size: 10 
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
     patch_size: 384
@@ -54,10 +54,13 @@ model:
   init_args:
     model_factory: EncoderDecoderFactory
     model_args:
-      backbone: terramind_v1_base  # large version: terramind_v1_large
+      backbone: terramind_v1_base_tim  # large version: terramind_v1_large
       backbone_pretrained: true
       backbone_modalities:
         - S1GRD
+      backbone_tim_modalities:
+        - S1RTC
+        - S2L2A
       backbone_merge_method: mean
 
       necks:
