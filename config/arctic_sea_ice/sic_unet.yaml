@@ -1,5 +1,5 @@
 # lightning.pytorch==2.1.1
-seed_everything: 42
+seed_everything: 20250624
 trainer:
   fast_dev_run: false
   num_sanity_val_steps: 0
@@ -72,18 +72,7 @@ model:
       num_classes: 11 
     loss: ce 
     ignore_index: -1
-    class_weights:
-      - 0.03048606
-      - 0.2155147
-      - 0.05279231
-      - 0.07369071
-      - 0.11573942
-      - 0.06410955
-      - 0.21568525
-      - 0.07966561
-      - 0.06758043
-      - 0.04544184
-      - 0.03929412
+    class_weights: [0.0409, 4.61, 1.00, 1.18, 1.74, 1.09, 1.77, 0.945, 0.607, 0.327, 0.0906]
     plot_on_val: false
     freeze_backbone: false
     freeze_decoder: false

@@ -74,7 +74,7 @@ model:
       num_classes: 7
     loss: ce 
     ignore_index: -1
-    class_weights: [0.01719759, 0.06322532, 0.04151718, 0.03421091, 0.01421854, 0.02581202, 0.80381844]
+    class_weights: [0.0664, 10.5, 1.61, 1.00, 0.663, 0.193, 29.1]
     plot_on_val: false
     freeze_backbone: false
     freeze_decoder: false
