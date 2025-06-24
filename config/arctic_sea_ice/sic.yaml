@@ -26,6 +26,13 @@ trainer:
       init_args:
         monitor: val/Multiclass_Jaccard_Index
         mode: max
+        filename: "best-jaccard-epoch-{epoch}"
+        save_top_k: 1
+    - class_path: ModelCheckpoint
+      init_args:
+        monitor: val/Multiclass_Accuracy
+        mode: max
+        filename: "best-mca-epoch-{epoch}"
         save_top_k: 1
     - class_path: EarlyStopping
       init_args:
@@ -41,7 +48,7 @@ trainer:
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
-    batch_size: 12
+    batch_size: 10
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
     patch_size: 768
