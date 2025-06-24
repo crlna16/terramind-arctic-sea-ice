@@ -11,3 +11,5 @@ source ~/.bashrc
 conda activate terramind
 
 terratorch fit -c config/arctic_sea_ice/sic.yaml --custom_modules_path="/work/ka1176/caroline/gitlab/terramind-demo" 
+
+wandb artifact cache cleanup --remove-temp 0GB

@@ -1,5 +1,5 @@
 # lightning.pytorch==2.1.1
-seed_everything: 42
+seed_everything: 20250624
 trainer:
   fast_dev_run: false
   num_sanity_val_steps: 0
@@ -41,13 +41,14 @@ trainer:
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
-    batch_size: 24
+    batch_size: 64 
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
-    patch_size: 512
+    patch_size: 768
     target: FLOE
     samples_per_chart: 10
-    renormalize: true
+    renormalize: false
+    chart_weights: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice/train/chart_weights.csv
 
 model:
   class_path: terratorch.tasks.SemanticSegmentationTask
@@ -57,6 +58,14 @@ model:
       backbone: UNet
       backbone_pretrained: None
       backbone_in_channels: 2
+      backbone_out_channels: 32
+      backbone_num_stages: 8
+      backbone_strides: [1, 1, 1, 1, 1, 1, 1, 1]
+      backbone_enc_num_convs: [2, 2, 2, 2, 2, 2, 2, 2]
+      backbone_enc_dilations: [1, 1, 1, 1, 1, 1, 1, 1]
+      backbone_dec_num_convs: [2, 2, 2, 2, 2, 2, 2]
+      backbone_dec_dilations: [1, 1, 1, 1, 1, 1, 1]
+      backbone_downsamples: [true, true, true, true, true, true, true]
 
       decoder: IdentityDecoder
 
