@@ -25,6 +25,13 @@ trainer:
       init_args:
         monitor: val/Multiclass_Jaccard_Index
         mode: max
+        filename: "best-jaccard-{epoch}"
+        save_top_k: 1
+    - class_path: ModelCheckpoint
+      init_args:
+        monitor: val/Multiclass_Accuracy
+        mode: max
+        filename: "best-mca-{epoch}"
         save_top_k: 1
     - class_path: EarlyStopping
       init_args:
@@ -40,13 +47,14 @@ trainer:
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
-    batch_size: 24
+    batch_size: 10
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
-    patch_size: 512
+    patch_size: 768
     target: SOD
-    samples_per_chart: 10
+    samples_per_chart: 20
     renormalize: true
+    chart_weights: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice/train/chart_weights.csv
 
 model:
   class_path: terratorch.tasks.SemanticSegmentationTask

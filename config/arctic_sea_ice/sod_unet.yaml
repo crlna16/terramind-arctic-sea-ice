@@ -26,6 +26,13 @@ trainer:
       init_args:
         monitor: val/Multiclass_Jaccard_Index
         mode: max
+        filename: "best-jaccard-{epoch}"
+        save_top_k: 1
+    - class_path: ModelCheckpoint
+      init_args:
+        monitor: val/Multiclass_Accuracy
+        mode: max
+        filename: "best-mca-{epoch}"
         save_top_k: 1
     - class_path: EarlyStopping
       init_args:
