@@ -5,6 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --time=48:00:00
+#SBATCH --ntasks=10
 #SBATCH -o scripts/slurm/slurm-%j.out
 
 source ~/.bashrc

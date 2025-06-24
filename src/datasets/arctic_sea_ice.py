@@ -315,7 +315,7 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
 
     def __len__(self):
         """Return the number of samples in the dataset."""
-        return len(self.orig_ice_charts)
+        return len(self.ice_charts)
 
     def __iter__(self):
         # Get worker info

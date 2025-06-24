@@ -33,7 +33,7 @@ trainer:
         min_delta: 0.0005
         strict: false
         check_on_train_epoch_end: false
-  max_epochs: 30
+  max_epochs: 100
   log_every_n_steps: 5
   default_root_dir: output/ArcticSeaIce-SOD/
 
