@@ -30,7 +30,7 @@ class ArcticSeaIceBaseDataset(ABC):
                  seed = None,
                  patch_size: int = 256,
                  fill_values_to_nan: bool = True,
-                 max_nan_frac: float = 0.25,
+                 max_nan_frac: float = 0.99,
                  renormalize: bool = False,
                  return_chart_name: bool = False,
                 ):
@@ -43,7 +43,7 @@ class ArcticSeaIceBaseDataset(ABC):
             seed (_type_, optional): Random seed. Defaults to None.
             patch_size (int, optional): Sample patch size. Defaults to 256.
             fill_values_to_nan (bool, optional): If True, replace fill values with NaN. Defaults to True.
-            max_nan_frac (float, optional): Maximum fraction of NaN pixels accepted in a random patch. Defaults to 0.25.
+            max_nan_frac (float, optional): Maximum fraction of NaN pixels accepted in a random patch. Defaults to 0.99.
             renormalize (bool, optional): If True, renormalize tensors with Terramind stats. Defaults to False.
             return_chart_name (bool, optional): If True, return the ice chart name in the output. Defaults to False.
         """        
@@ -94,7 +94,7 @@ class ArcticSeaIceBaseDataset(ABC):
             return ds[features + [target]]
 
     @staticmethod
-    def _select_patch(ds, patch_size, var='nersc_sar_primary', seed=None, max_nan_frac=0.25):
+    def _select_patch(ds, patch_size, var='nersc_sar_primary', seed=None, max_nan_frac=0.99):
         '''Select a small patch from ds. Resample until we find a sample with less than max_nan_frac empty pixels.'''
 
         xmax = len(ds.sar_samples) - patch_size
@@ -167,7 +167,7 @@ class ArcticSeaIceValidationDataset(ArcticSeaIceBaseDataset, Dataset):
                  seed = None,
                  patch_size: int = 256,
                  fill_values_to_nan: bool = True,
-                 max_nan_frac: float = 0.25,
+                 max_nan_frac: float = 0.99,
                  renormalize: bool = False,
                  return_chart_name: bool = False,
                 ):
@@ -239,7 +239,7 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                  seed = None,
                  patch_size: int = 256,
                  fill_values_to_nan: bool = True,
-                 max_nan_frac: float = 0.25,
+                 max_nan_frac: float = 0.99,
                  samples_per_chart: int = 10,
                  augment: bool = True,
                  renormalize: bool = False,
@@ -426,7 +426,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                  seed = None,
                  patch_size: int = 256,
                  fill_values_to_nan: bool = True,
-                 max_nan_frac: float = 0.25,
+                 max_nan_frac: float = 0.99,
                  batch_size: int = 8,
                  num_workers: int = 8,
                  shuffle: bool = True,
