@@ -87,9 +87,26 @@ class ArcticSeaIceBaseDataset(ABC):
         with xr.open_dataset(path) as ds:
 
             if fill_values_to_nan:
-                ds['nersc_sar_primary'] = xr.where(ds['nersc_sar_primary'] != 0, ds['nersc_sar_primary'], None)
-                ds['nersc_sar_secondary'] = xr.where(ds['nersc_sar_secondary'] != 0, ds['nersc_sar_secondary'], None)
+                for feat in features:
+                    ds[feat] = xr.where(ds[feat] != 0, ds[feat], None)
                 ds[target] = xr.where(ds[target] != 255, ds[target], None)
+
+                # strip empty rows
+                # averaged across sar_lines -> indices for sar_samples
+                sl = (~np.isnan(ds[features[0]])).sum(dim="sar_lines")
+                sl = np.where(sl>0)[0][[0, -1]]
+
+                # averaged across sar_samples -> indices for sar_lines
+                sp = (~np.isnan(ds[features[0]])).sum(dim="sar_samples")
+                sp = np.where(sp>0)[0][[0, -1]]
+
+                ds = ds.isel(sar_lines=slice(*sp), sar_samples=slice(*sl))
+                if len(ds.sar_lines) < 1000 or len(ds.sar_samples) < 1000:
+                    logger.warning(f"Dataset {path} has less than 1000 sar_lines or sar_samples after removing empty rows. "
+                                   f"Lines: {len(ds.sar_lines)}, Samples: {len(ds.sar_samples)}. "
+                                   f"Consider checking the dataset.")
+
+
 
             return ds[features + [target]]
 
