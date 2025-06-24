@@ -121,8 +121,7 @@ class ArcticSeaIceBaseDataset(ABC):
                 count += 1
 
         if count == max_lookups:
-            logger.warning(f'Could not find a patch with less than {max_nan_frac} NaN pixels in {max_lookups} attempts. Returning None.') 
-            return None
+            logger.warning(f'Could not find a patch with less than {max_nan_frac} NaN pixels in {max_lookups} attempts.') 
         
         return patch
 
@@ -348,8 +347,6 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                            )
             
             patch = self._select_patch(ds, self.patch_size, var=self.target, seed=self.seed, max_nan_frac=self.max_nan_frac)
-            if patch is None:
-                continue
             x, y, = self._extract_tensors(patch, self.features, self.target)
 
             # Data augmentation
@@ -366,6 +363,103 @@ class ArcticSeaIceIterableDataset(ArcticSeaIceBaseDataset, IterableDataset):
                 yield {"image": x, "mask": y.squeeze(), "ice_chart": os.path.basename(ice_chart)}
 
             yield {"image": x, "mask": y.squeeze()}
+
+class ArcticSeaIceTrainDataset(ArcticSeaIceBaseDataset):
+    '''Train dataset for Arctic sea ice charts. Draws random patches.'''
+    def __init__(self, 
+                 ice_charts: List[str],
+                 features: List[str] = ['nersc_sar_primary', 'nersc_sar_secondary'],
+                 target: str = "SIC", 
+                 seed = None,
+                 patch_size: int = 256,
+                 fill_values_to_nan: bool = True,
+                 max_nan_frac: float = 0.99,
+                 samples_per_chart: int = 10,
+                 augment: bool = True,
+                 renormalize: bool = False,
+                 return_chart_name: bool = False,
+                 chart_weights: str = 'chart_weights.csv',
+                ):
+        super().__init__(ice_charts=ice_charts,
+                         features=features,
+                         target=target,
+                         seed=seed,
+                         patch_size=patch_size,
+                         fill_values_to_nan=fill_values_to_nan,
+                         max_nan_frac=max_nan_frac,
+                         renormalize=renormalize,
+                         return_chart_name=return_chart_name
+                         )
+        
+        self.samples_per_chart = samples_per_chart  # Number of samples to take from each chart
+        self.augment = augment  # Whether to apply data augmentation
+        self.chart_weights = chart_weights
+
+        if self.chart_weights is not None:
+            print(f"Loading chart weights from {chart_weights} and normalizing them")
+            self.df_chart_weights = pd.read_csv(chart_weights, index_col=0)
+            self.df_chart_weights["weight"] = self.df_chart_weights["weight"] / self.df_chart_weights["weight"].sum()
+            print(self.df_chart_weights.head())
+
+        print(f"Using {self.samples_per_chart} samples per chart with {len(self.ice_charts)} ice charts.")
+
+        self.orig_ice_charts = self.ice_charts.copy()  # Store original ice charts for reshuffling
+
+        # Repeat chart based on weights
+        if self.df_chart_weights is None:
+            self.ice_charts = self.orig_ice_charts * self.samples_per_chart
+        else:
+            # Repeat each ice chart according to its weight
+            tmp_ice_charts = []
+            for ice_chart in self.orig_ice_charts:
+                if not os.path.basename(ice_chart) in self.df_chart_weights.index:
+                    raise ValueError(f"Ice chart {os.path.basename(ice_chart)} not found in chart weights.")
+
+                weight = self.df_chart_weights.loc[os.path.basename(ice_chart), 'weight']
+                num_samples = int(np.round(weight * self.samples_per_chart * len(self.orig_ice_charts)))
+                num_samples = max(num_samples, 1)  # Ensure at least one sample per chart
+                logger.debug(f"Processing ice chart: {os.path.basename(ice_chart)} with weight {weight}: {num_samples} samples")
+                tmp_ice_charts.extend([ice_chart] * num_samples)
+            self.ice_charts = tmp_ice_charts
+        print(f"Total number of ice charts after valid pixel weighting: {len(self.ice_charts)}")
+
+        if self.augment:
+            print("Data augmentation: horizontal and vertical flips")
+            self.transforms = v2.Compose([
+                v2.RandomHorizontalFlip(),
+                v2.RandomVerticalFlip(),
+            ])
+        else:
+            self.transforms = None
+
+    def __len__(self):
+        """Return the number of samples in the dataset."""
+        return len(self.ice_charts)
+
+    def __getitem__(self, idx):
+        ds = self._load_dataset(self.ice_charts[idx], 
+                        self.features, 
+                        self.target,
+                        fill_values_to_nan=self.fill_values_to_nan
+                        )
+            
+        patch = self._select_patch(ds, self.patch_size, var=self.target, seed=self.seed, max_nan_frac=self.max_nan_frac)
+        x, y, = self._extract_tensors(patch, self.features, self.target)
+
+        # Data augmentation
+        if self.augment and self.transforms is not None:
+            x = tv_tensors.Image(x)
+            y = tv_tensors.Mask(y)
+
+            x, y = self.transforms(x, y)
+
+        if self.renormalize:
+            x = self._renormalize_tensors(x, self.norm_values)
+
+        if self.return_chart_name:
+            return {"image": x, "mask": y.squeeze(), "ice_chart": os.path.basename(self.ice_charts[idx])}
+
+        return {"image": x, "mask": y.squeeze()}
 
 class ArcticSeaIceDataset(ArcticSeaIceBaseDataset, Dataset):
     '''Dataset for inference on Arctic sea ice charts.'''
@@ -472,7 +566,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
             if self.shuffle:
                 self.rng.shuffle(train_ice_charts)
             
-            self.train_ds = ArcticSeaIceIterableDataset(train_ice_charts,
+            self.train_ds = ArcticSeaIceTrainDataset(train_ice_charts,
                                                         features=self.features,
                                                         target=self.target,
                                                         seed=self.seed,
@@ -526,8 +620,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
                                                  )
 
     def train_dataloader(self):
-        # shuffling is handled in iterable dataset
-        return torch.utils.data.DataLoader( self.train_ds, batch_size=self.batch_size, shuffle=False,  num_workers=self.num_workers, pin_memory=True)
+        return torch.utils.data.DataLoader( self.train_ds, batch_size=self.batch_size, shuffle=True,  num_workers=self.num_workers, pin_memory=True)
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(self.val_ds, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers, pin_memory=True)
