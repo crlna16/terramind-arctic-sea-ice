@@ -89,9 +89,9 @@ model:
     tiled_inference_on_testing: true
     tiled_inference_parameters:
       h_crop: 512
-      h_stride: 496
+      h_stride: 256
       w_crop: 512
-      w_stride: 496
+      w_stride: 256
       average_patches: true
     class_names:
       - "0: Open-water"

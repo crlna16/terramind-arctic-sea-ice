@@ -1,5 +1,5 @@
 # lightning.pytorch==2.1.1
-seed_everything: 42
+seed_everything: 20250624
 trainer:
   fast_dev_run: false
   num_sanity_val_steps: 0
@@ -47,7 +47,7 @@ trainer:
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
-    batch_size: 10
+    batch_size: 2 
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
     patch_size: 768
@@ -61,10 +61,12 @@ model:
   init_args:
     model_factory: EncoderDecoderFactory
     model_args:
-      backbone: terramind_v1_base  # large version: terramind_v1_large
+      backbone: terramind_v1_base_tim  # large version: terramind_v1_large
       backbone_pretrained: true
       backbone_modalities:
         - S1GRD
+      backbone_tim_modalities:
+        - DEM
       backbone_merge_method: mean
 
       necks:
