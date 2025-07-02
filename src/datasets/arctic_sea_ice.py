@@ -569,6 +569,7 @@ class ArcticSeaIceDataModule(L.LightningDataModule):
         self.train_ds = None
         self.val_ds = None
         self.test_ds = None
+        self.predict_ds = None
 
         self.rng = np.random.default_rng(self.seed)
 

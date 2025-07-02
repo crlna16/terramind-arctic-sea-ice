@@ -54,7 +54,7 @@ data:
     patch_size: 768
     target: SIC
     samples_per_chart: 20
-    renormalize: true
+    renormalize: false
     chart_weights: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice/train/chart_weights.csv
 
 model:

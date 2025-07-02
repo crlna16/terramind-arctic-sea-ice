@@ -10,4 +10,6 @@
 source ~/.bashrc
 conda activate terramind
 
-terratorch test -c config/arctic_sea_ice/sod_unet.yaml --custom_modules_path="/work/ka1176/caroline/gitlab/terramind-demo" --ckpt_path "output/wandb/sod/arctic-sea-ice/mz8et341/checkpoints/best-jaccard-epoch=70.ckpt" --predict_output_dir output/predictions/sod
+#terratorch test -c config/arctic_sea_ice/sod_unet.yaml --custom_modules_path="/work/ka1176/caroline/gitlab/terramind-demo" --ckpt_path "output/wandb/sod/arctic-sea-ice/mz8et341/checkpoints/best-jaccard-epoch=70.ckpt" --predict_output_dir output/predictions/sod
+
+python scripts/predict.py --target=SOD --checkpoint="output/wandb/sod/arctic-sea-ice/mz8et341//checkpoints/best-jaccard-epoch=70.ckpt" --key=unet
