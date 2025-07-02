@@ -26,13 +26,26 @@ def plot_prediction(ice_chart, plot_dir='compare-final-models', keys=['terramind
     fig, ax = plt.subplots(nr, nc, sharex=False, sharey=False, figsize=(nc*3, nr*3))
     shrink = 0.90
 
-    plotvals = {'SIC': {'label':'SIC (10/10)', 'cmap':'Blues_r', 'levels':list(range(11)),
-                        'ticklabels':list(range(11))},
-                'SOD': {'label':'SOD', 'cmap':'rainbow', 'levels':list(range(6)),
-                        'ticklabels':['Open water', 'New ice', 'Young ice', 'Thin First-year ice', 'Thick First-year ice', 'Old ice']},
-                'FLOE': {'label':'FLOE', 'cmap':'rainbow', 'levels':list(range(7)),
-                        'ticklabels':['Open water', 'Cake ice', 'Small floe', 'Medium floe', 'Big floe', 'Vast floe', 'Bergs']},
-                }
+    plotvals = {
+        'SIC': {
+            'label': 'SIC (10/10)',
+            'cmap': 'Blues_r',
+            'levels': list(range(11)),
+            'ticklabels': [f"{int(x*10)}%" for x in range(11)]
+        },
+        'SOD': {
+            'label': 'SOD',
+            'cmap': 'rainbow',
+            'levels': list(range(6)),
+            'ticklabels': ['Open water', 'New ice', 'Young ice', 'Thin First-year ice', 'Thick First-year ice', 'Old ice']
+        },
+        'FLOE': {
+            'label': 'FLOE',
+            'cmap': 'rainbow',
+            'levels': list(range(7)),
+            'ticklabels': ['Open water', 'Cake ice', 'Small floe', 'Medium floe', 'Big floe', 'Vast floe', 'Bergs']
+        },
+    }
 
     # --------------------------------------------------------------
     # Reference data
@@ -44,6 +57,10 @@ def plot_prediction(ice_chart, plot_dir='compare-final-models', keys=['terramind
         sar2 = ds["nersc_sar_secondary"].values
     sar1 = np.where(sar1 == 0, None, sar1).astype(float)
     sar2 = np.where(sar2 == 0, None, sar2).astype(float)
+
+    # rescale
+    sar1 = sar1 * 5.660 - 14.508
+    sar2 = sar2 * 4.747 - 24.701
 
     img = ax[0, 0].imshow(sar1, cmap='Greys')
     cbar = plt.colorbar(img, ax=ax[0, 1], shrink=shrink)
@@ -81,12 +98,18 @@ def plot_prediction(ice_chart, plot_dir='compare-final-models', keys=['terramind
         print(target)
         #if target == 'FLOE':
         #    continue
+        tmpcond = ~np.isnan(true_masks[target]).flatten()
         
         for j, key in enumerate(keys):
             print(' ', key)
 
             with xr.open_dataset(os.path.join('../output/predictions', key, target, os.path.basename(ice_chart))) as pred_ds:
                 val = np.where(np.isnan(true_masks[target]), None, pred_ds[target].values).astype(float)
+
+            if target == 'SIC':
+                print(f"R2 score for {key} on {target}: {r2_score(true_masks[target].flatten()[tmpcond], val.flatten()[tmpcond])}")
+            else:
+                print(f"F1 score for {key} on {target}: {f1_score(true_masks[target].flatten()[tmpcond], val.flatten()[tmpcond], average='macro')}")
 
             img = ax[i+1, j+1].contourf(val, cmap=plotvals[target]["cmap"], levels=plotvals[target]["levels"])
 
