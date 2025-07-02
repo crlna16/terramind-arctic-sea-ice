@@ -34,10 +34,6 @@ def plot_prediction(ice_chart, plot_dir='compare-final-models', keys=['terramind
                         'ticklabels':['Open water', 'Cake ice', 'Small floe', 'Medium floe', 'Big floe', 'Vast floe', 'Bergs']},
                 }
 
-    # Hide all plots in the first row except the first two (SAR images)
-    for j in range(2, nc):
-        ax[0, j].set_visible(False)
-    
     # --------------------------------------------------------------
     # Reference data
     # --------------------------------------------------------------
@@ -50,11 +46,11 @@ def plot_prediction(ice_chart, plot_dir='compare-final-models', keys=['terramind
     sar2 = np.where(sar2 == 0, None, sar2).astype(float)
 
     img = ax[0, 0].imshow(sar1, cmap='Greys')
-    plt.colorbar(img, orientation="vertical", shrink=shrink)
+    cbar = plt.colorbar(img, ax=ax[0, 1], shrink=shrink)
     ax[0, 0].set_title("Sentinel-1 HH")
-    img = ax[0, 1].imshow(sar2, cmap='Greys')
-    plt.colorbar(img, orientation="vertical", shrink=shrink)
-    ax[0, 1].set_title("Sentinel-1 HV")
+    img = ax[0, 2].imshow(sar2, cmap='Greys')
+    cbar = plt.colorbar(img, ax=ax[0, 3], shrink=shrink)
+    ax[0, 2].set_title("Sentinel-1 HV")
 
     with xr.open_dataset(ice_chart.replace('_prep.nc', '_prep_reference.nc')) as reference_ds:
     
@@ -73,7 +69,7 @@ def plot_prediction(ice_chart, plot_dir='compare-final-models', keys=['terramind
 
     for i, target in enumerate(targets):
         img = ax[i+1, 0].contourf(true_masks[target], cmap=plotvals[target]["cmap"], levels=plotvals[target]["levels"])
-        cbar = plt.colorbar(img, ax=ax[i+1, -1], shrink=shrink, label=plotvals[target]["label"])
+        cbar = plt.colorbar(img, ax=ax[i+1, -1], shrink=shrink)
         cbar.set_ticks(ticks=plotvals[target]["levels"], labels=plotvals[target]["ticklabels"])
         ax[i+1, 0].set_title(f"Ground truth - {target}")
 
@@ -93,22 +89,22 @@ def plot_prediction(ice_chart, plot_dir='compare-final-models', keys=['terramind
                 val = np.where(np.isnan(true_masks[target]), None, pred_ds[target].values).astype(float)
 
             img = ax[i+1, j+1].contourf(val, cmap=plotvals[target]["cmap"], levels=plotvals[target]["levels"])
-            #cbar = plt.colorbar(img, ax=ax[i+1, j+1], shrink=shrink)
-            #cbar.set_ticks(ticks=plotvals[target]["levels"], labels=plotvals[target]["ticklabels"])
 
     # Set column titles (keys) and row titles (targets)
     
     # Set titles for each subplot with model+target
     for i, target in enumerate(targets):
         for j, key in enumerate(keys):
-            if i == 0:  # Only set column headers once
-                ax[0, j+1].set_title(key)
+            #if i == 0:  # Only set column headers once
+            #    ax[0, j+1].set_title(key)
             ax[i+1, j+1].set_title(f"{key} - {target}")
 
     [axx.set_aspect('equal') for axx in ax.flatten()]
     [axx.set_xticks([]) for axx in ax.flatten()]
     [axx.set_yticks([]) for axx in ax.flatten()]
     [axx.axis('off') for axx in ax[:, -1].flatten()]
+    ax[0, 1].axis('off')  # Hide the empty plot in the first row, second column
+    ax[0, 3].axis('off')  # Hide the empty plot in the first row, fourth column
     fig.suptitle(os.path.basename(ice_chart))
 
     fig.tight_layout()
