@@ -4,7 +4,7 @@
 
 Dataset: https://data.dtu.dk/collections/AI4Arctic_Sea_Ice_Challenge_Dataset/6244065
 
-Based on Sentinel-1 and MWR. Any possible to combine ??
+Based on Sentinel-1 and MWR. Using only Sentinel-1.
 
 Idea: Predict sea ice type
 
