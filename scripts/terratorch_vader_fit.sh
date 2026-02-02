@@ -8,8 +8,7 @@
 #SBATCH --ntasks=10
 #SBATCH -o scripts/slurm/slurm-%j.out
 
-source ~/.bashrc
-conda activate terramind
+source .venv/bin/activate
 
 terratorch fit -c config/arctic_sea_ice/sic.yaml --custom_modules_path="/work/ka1176/caroline/gitlab/terramind-demo" 
 

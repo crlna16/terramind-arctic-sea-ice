@@ -8,8 +8,7 @@
 #SBATCH --constraint=a100_80
 #SBATCH -o scripts/slurm/slurm-%j.out
 
-source ~/.bashrc
-conda activate terramind
+source .venv/bin/activate
 
 # pass e.g. config/arctic_sea_ice/sic.yaml as the first argument
 
