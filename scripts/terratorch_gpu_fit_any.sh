@@ -8,13 +8,12 @@
 #SBATCH --constraint=a100_80
 #SBATCH -o scripts/slurm/slurm-%j.out
 
-source .venv/bin/activate
-
 # pass e.g. config/arctic_sea_ice/sic.yaml as the first argument
 
 export WANDB_CACHE_DIR="/scratch/k/k202141/wandb_cache"
 export WANDB_DATA_DIR ="/scratch/k/k202141/wandb_data"
+export PYTHONPATH="/work/ka1176/caroline/gitlab/terramind-demo:$PYTHONPATH"
 
-terratorch fit -c $1 --custom_modules_path="/work/ka1176/caroline/gitlab/terramind-demo"
+uv run terratorch fit -c $1 
 
-wandb artifact cache cleanup --remove-temp 0GB
+uv run wandb artifact cache cleanup --remove-temp 0GB
