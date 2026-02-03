@@ -23,7 +23,7 @@ trainer:
     - class_path: src.utils.WandBConfigCallback
     - class_path: ModelCheckpoint
       init_args:
-        monitor: val/Multiclass_Jaccard_Index
+        monitor: val/mIoU
         mode: max
         filename: "best-jaccard-{epoch}"
         save_top_k: 1

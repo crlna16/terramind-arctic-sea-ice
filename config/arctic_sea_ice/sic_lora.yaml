@@ -12,7 +12,8 @@ trainer:
     - class_path: lightning.pytorch.loggers.WandbLogger
       init_args:
         project: "arctic-sea-ice" 
-        save_dir: "output/wandb/floe"
+        #name: "terramind-sic"
+        save_dir: "output/wandb/sic"
         log_model: true
   callbacks:
     - class_path: src.utils.EpochShuffle
@@ -42,18 +43,18 @@ trainer:
         check_on_train_epoch_end: false
   max_epochs: 100
   log_every_n_steps: 5
-  default_root_dir: output/ArcticSeaIce-FLOE/
+  default_root_dir: output/ArcticSeaIce-SIC/
 
 data:
   class_path: src.datasets.arctic_sea_ice.ArcticSeaIceDataModule
   init_args:
-    batch_size: 2 
+    batch_size: 10
     num_workers: 8
     data_root: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice
     patch_size: 768
-    target: FLOE
+    target: SIC
     samples_per_chart: 20
-    renormalize: true
+    renormalize: false
     chart_weights: /work/ka1176/caroline/gitlab/terramind-demo/data/arctic_sea_ice/train/chart_weights.csv
 
 model:
@@ -61,13 +62,23 @@ model:
   init_args:
     model_factory: EncoderDecoderFactory
     model_args:
-      backbone: terramind_v1_base_tim  # large version: terramind_v1_large
+      backbone: terramind_v1_base  # large version: terramind_v1_large
       backbone_pretrained: true
       backbone_modalities:
         - S1GRD
-      backbone_tim_modalities:
-        - DEM
       backbone_merge_method: mean
+
+      # Add LoRA configuration
+      peft_config:
+        peft_type: LORA
+        r: 16                    # Rank of the low-rank matrices
+        lora_alpha: 32           # Scaling factor
+        lora_dropout: 0.1        # Dropout probability
+        target_modules:          # Which modules to apply LoRA to
+          - qkv                  # Attention QKV projections
+          - proj                 # Attention output projection
+          - fc1                  # MLP first layer
+          - fc2                  # MLP second layer
 
       necks:
         - name: SelectIndices
@@ -81,10 +92,10 @@ model:
       decoder_channels: [512, 256, 128, 64]
 
       head_dropout: 0.1
-      num_classes: 7
+      num_classes: 11 
     loss: ce 
     ignore_index: -1
-    class_weights: [0.0664, 10.5, 1.61, 1.00, 0.663, 0.193, 29.1]
+    class_weights: [0.0409, 4.61, 1.00, 1.18, 1.74, 1.09, 1.77, 0.945, 0.607, 0.327, 0.0906]
     plot_on_val: false
     freeze_backbone: false
     freeze_decoder: false
@@ -96,13 +107,17 @@ model:
       w_stride: 256
       average_patches: true
     class_names:
-      - "0: Open-water"
-      - "1: Cake ice"
-      - "2: Small floe"
-      - "3: Medium floe"
-      - "4: Big floe"
-      - "5: Vast floe"
-      - "6: Bergs"
+      - "SIC 0/10"
+      - "SIC 1/10"
+      - "SIC 2/10"
+      - "SIC 3/10"
+      - "SIC 4/10"
+      - "SIC 5/10"
+      - "SIC 6/10"
+      - "SIC 7/10"
+      - "SIC 8/10"
+      - "SIC 9/10"
+      - "SIC 10/10"
 
 optimizer:
   class_path: torch.optim.AdamW
